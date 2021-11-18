@@ -11,6 +11,7 @@ DO2=0
 DO3=0
 DO4=0
 DOA=1
+DES=
 
 usage()
 {
@@ -37,8 +38,8 @@ do
          h)  usage; exit 1 ;;
          p)  PORT=$OPTARG  ;;
          c)  DO=1 ;;
-         v)  XARG="$XARG -v" ;;
-         d)  XARG="$XARG --delete" ;;
+         v)  XARG="$XARG -v" ; DES="$DES VERB 1" ;;
+         d)  XARG="$XARG --delete" DES="$DES DEL 1";;
          o)  XARG="$XARG $OPTARG";;
          S)  SRC="$OPTARG" ;;
          T)  TWOF=1 ;;
@@ -86,9 +87,9 @@ fi
 DOD=DRY
 if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
-  xfer $SRC to $DST root $DST, 
-  PHASE1: $DO1, PHASE2: $DO2, PHASE3: $DO3, PHASE4: $DO4
-  TWOPH $TWOF, BATCH $BANG,  
+  xfer $SRC to $DST root $DST
+  PHASE1: $DO1  PHASE2: $DO2  PHASE3: $DO3  PHASE4: $DO4
+  TWOPH $TWOF BATCH $BANG DES
   rsync args $BARG $XARG"
 
 
@@ -164,9 +165,9 @@ if [[ $DO3 = 1 ]]; then
   if [[ $DO = 1 ]]; then
     echo "*** NOW WE ARE MAKING A NEW SYSTEM"
   fi
-  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces"
+  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces*"
   set -x
-  rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces'  --exclude '/etc/sysconfing/network-scripts*' $XARG -e "ssh -p $PORT" $SRC/ $DEST
+  rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfing/network-scripts*' $XARG -e "ssh -p $PORT" $SRC/ $DEST
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -178,7 +179,7 @@ if [[ $DO3 = 1 ]]; then
   echo "*
 GRUB-INSTALL 
 EXCLUDED /etc/fstab
-EXCLUDE /etc/network/interfaces (debian) or /etc/sysconfig/network-scripts* (rhel)
+EXCLUDE /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
 ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
   if [[ $TWOF = 1 ]]; then
     echo "* Hopefully you already have a session and in addition to other tasks try to
