@@ -1,41 +1,52 @@
 #!/bin/bash
-#v1.1
+#v1.2
 SRC=.
 PORT=22
 XARG=""
 DO=0
 TWOF=
-FIXO=
+BANG=
+DO1=1
+DO2=1
+DO3=1
+DO4=1
+DOA=1
+
 usage()
 {
   cat >&2 <<EOF
   Usage: $0 [opt] <[USER@]HOST> <DEST>
    -p <port>, default $PORT
-   -v  verbose
    -c  DO it, else dry run
+   -v  verbose
    -d  Delete
-   -S  SRC dir, default $BASE
-   -B  BANG! Dont stop on errors
    -o  Extra rsync options
-   -t  Run two phase, excluding /bin /sbin /lib
-   -r  Running system, exclude things
-   -f  FIX only (Step 4)"
+   -S  SRC dir, default $BASE
+   -T  Run two phase, excluding /bin /sbin /lib
+   -B  BANG! Dont stop on errors
+   -1  Prepare only, copy to /sysold and /sysnew (Step 1)
+   -3  Copy phanse only (Step 3)
+   -4  FIX only (Step 4)"
 EOF
+   ## -r  Running system, exclude things
 }
 
-while getopts “hp:crvdo:S:2Bf” OPTION
+while getopts “hp:cvdo:S:TB1234” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
          p)  PORT=$OPTARG  ;;
-         v)  XARG="$XARG -v" ;;
          c)  DO=1 ;;
-         o)  XARG="$XARG $OPTARG";;
+         v)  XARG="$XARG -v" ;;
          d)  XARG="$XARG --delete" ;;
+         o)  XARG="$XARG $OPTARG";;
          S)  SRC="$OPTARG" ;;
-         2)  TWOF=true ;;
-         B)  BANG=true ;;
-         f)  FIXO=true ;;
+         T)  TWOF=1 ;;
+         B)  BANG=1 ;;
+         1)  DOA=0; DO1=1 ;;
+         2)  DOA=0; DO2=1 ;;
+         3)  DOA=0; DO3=1 ;;
+         4)  DOA=0; DO4=1 ;;
          #r)  XARG="$XARG --exclude=/etc/fstab --exclude=/etc/mtab --exclude=/etc/shadow --exclude=/etc/passwd --exclude=/etc/sysconfig/network* --exclude=/tmp  --exclude=/var/log --include=/var/lib/rpm --include=/var/lib/yum --exclude=/var/lib/* --exclude=/var/spool --exclude=/var/lock --exclude=/dev  --exclude=/root/.ssh --exclude=/root/w --exclude=/var/run " ;;
          ?)  usage; exit ;;
      esac
@@ -49,8 +60,8 @@ DEST=$SSH:$DST
 ([ -z "$DEST" ] || [ -z $SSH ] ) && usage && exit 2
 
 [ "$DO" != "1" ] && XARG="$XARG -n"
-ARET=0
 
+ARET=0
 
 ## -H Hard Links
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
@@ -75,38 +86,30 @@ echo "This is DO ${DO} run
 
 
 A=y
-if [[ $BANG != true ]]; then
+if [[ $BANG != 1 ]]; then
   read -p "You ok ?" A
 fi
 if ! [[ $A =~ y|Y ]]; then
   exit  3
 fi
 
-
-dofix() {
-  echo "*** STEP4: POST: fixings"
-  ssh -p $PORT $SSH  -o StrictHostKeyChecking=no 'set -x;
- root=`cat /proc/mounts  | awk '"'"' ~ /^\/$/ { print }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
- if [ -n "$root\" ]; then grub-install $root; fi
- if grep debian /etc/os-release; then update-grub; fi'
-}
-
-if [[ $FIXO = true ]]; then
-  echo "** SKIPPING SYNC, fast forward to step 4 (fixings)"
-  dofix
-  exit $?
+if [[ $DOA = 1 ]]; then
+  DO1=1; DO2=1; DO3=1; DO4=1;
 fi
 
-echo ""
-echo "*** STEP1: SSH to $SSH to prepare sysold, backup /etc"
-set -x
-ssh -p $PORT $SSH "set -e; echo '* Preparing $DST sysold sysnew'; mkdir -p $DST/sysold; mkdir -p $DST/sysnew; if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; exit 4; fi; cp -a $DST/etc $DST/sysold; echo 'Ok'"
-RT=$?; set +x
-[ "$RT" != "0" ] && ARET=$RT
+
+
+if [[ $DO1 = 1]]; then
+  echo ""
+  echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
+  set -x
+  ssh -p $PORT $SSH "set -e; echo '* Preparing $DST sysold sysnew'; mkdir -p $DST/sysold; mkdir -p $DST/sysnew; if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; exit 4; fi; cp -a $DST/etc $DST/sysold; echo 'Ok'"
+  RT=$?; set +x
+  [ "$RT" != "0" ] && ARET=$RT
 
   if [ "$ARET" != "0" ];  then 
     A=y
-    if [ "$BANG" != "true" ]; then
+    if [[ $BANG != 1 ]]; then
       read -p "Maybe not or ?" A
     fi
     if ! [[ $A =~ y|Y ]]; then
@@ -115,34 +118,35 @@ RT=$?; set +x
   fi
 
   echo ""
-  echo "*** STEP 2: RSYNC $SRC/etc to $DEST/sysnew for reference"
+  echo "*** STEP 1b: RSYNC $SRC/etc to $DEST/sysnew for reference"
   set -x
   rsync $BARG --delete $SRC/etc/ $DEST/sysnew/etc/ -e "ssh -p $PORT"
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
+fi
 
-  if [[ $TWOF = true ]]; then
+if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
+  echo
+  echo "*** STEP 2 (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
+  rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh -p $PORT" $SRC $DEST/sysnew/
+  RT=$?;   set +x
+  [ "$RT" != "0" ] && ARET=$RT
 
-    echo "*** STEP 2.1 (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
-    rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh -p $PORT" $SRC $DEST/sysnew/
-    RT=$?;   set +x
-    [ "$RT" != "0" ] && ARET=$RT
-
-    XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
-  fi
+  XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
+fi
     
-  if [ "$ARET" != "0" ];  then 
-    A=y
-    if [ "$BANG" != "true" ]; then
-      read -p "Maybe not or ?" A
-    fi
-    if ! [[ $A =~ y|Y ]]; then
-      exit 4
-    fi
+if [ "$ARET" != "0" ];  then 
+  A=y
+  if [[ $BANG != 1 ]]; then
+    read -p "Maybe not or ?" A
   fi
+  if ! [[ $A =~ y|Y ]]; then
+    exit 4
+  fi
+fi
 
 
-if [[ $TWOF != true ]]; then
+if [[ $TWOF != 1 ]]; then
   echo "* One phase (same system type mode) "
 else
   echo "* TWO PHASE (frankenstein mode)"
@@ -151,32 +155,43 @@ else
 fi
 
 
+if [[ $DO3 = 1 ]]; then
   echo ""
   if [[ $DO = 1 ]]; then
     echo "*** NOW WE ARE MAKING A NEW SYSTEM"
   fi
-  echo "*** STEP3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces"
+  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces"
   set -x
   rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces'  --exclude '/etc/sysconfing/network-scripts*' $XARG -e "ssh -p $PORT" $SRC/ $DEST
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
-  ## STEP4
-  dofix
-
   echo "*** POST: DIFFING"
   ssh -p $PORT $SSH -o StrictHostKeyChecking=no "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces"
 
   echo "*** SYNCED $ARET ***"
-  echo "*** EXCLUDED (Check and sync them manually !!):"
+  echo "*** Check and sync them manually !!:"
   echo "*
-/etc/fstab
-/etc/network/interfaces (debian) or /etc/sysconfig/network-scripts* (rhel)"
-  echo "** ALSO dont forget to check /etc/shadow and /root/.ssh/authrorized_keys, and update-grub!!"
-  if [[ $TWOF = true ]]; then
-    echo "* Hopefully you already have a session and try to
-- fix booting (grub), network, access (shadow), and move back base utils  from /sysnew to / (for stuff excluded)"
+GRUB-INSTALL 
+EXCLUDED /etc/fstab
+EXCLUDE /etc/network/interfaces (debian) or /etc/sysconfig/network-scripts* (rhel)
+ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
+  if [[ $TWOF = 1 ]]; then
+    echo "* Hopefully you already have a session and in addition to other tasks try to
+- move back base utils (/bin /sbin/ lib*) from /sysnew to / (for stuff excluded)"
   fi
+
+fi
+
+if [[ $DO4 = 1 ]]; then
+  echo
+  echo "*** STEP 4: POST: fixings"
+  ssh -p $PORT $SSH  -o StrictHostKeyChecking=no 'set -x;
+ root=`cat /proc/mounts  | awk '"'"' ~ /^\/$/ { print }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
+ if [ -n "$root\" ]; then grub-install $root; fi
+ if grep debian /etc/os-release; then update-grub; fi'
+
+fi
 
 
 echo "CODE: $ARET"
