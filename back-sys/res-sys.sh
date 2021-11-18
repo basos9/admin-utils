@@ -6,10 +6,10 @@ XARG=""
 DO=0
 TWOF=
 BANG=
-DO1=1
-DO2=1
-DO3=1
-DO4=1
+DO1=0
+DO2=0
+DO3=0
+DO4=0
 DOA=1
 
 usage()
@@ -79,8 +79,11 @@ EOF
 
 "
 
-echo "This is DO ${DO} run 
+DOD=DRY
+if [[ $DO = 1 ]]; then DOD=DO; fi
+echo "This is $DOD run 
   xfer $SRC to $DST root $DST, 
+  PHASE1: $DO1, PHASE2: $DO2, PHASE3: $DO3, PHASE4: $DO4
   TWOPH $TWOF, BATCH $BANG, FIXONL $FIXO 
   rsync args $BARG $XARG"
 
@@ -99,7 +102,7 @@ fi
 
 
 
-if [[ $DO1 = 1]]; then
+if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
   set -x
@@ -186,10 +189,15 @@ fi
 if [[ $DO4 = 1 ]]; then
   echo
   echo "*** STEP 4: POST: fixings"
-  ssh -p $PORT $SSH  -o StrictHostKeyChecking=no 'set -x;
- root=`cat /proc/mounts  | awk '"'"' ~ /^\/$/ { print }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
- if [ -n "$root\" ]; then grub-install $root; fi
- if grep debian /etc/os-release; then update-grub; fi'
+  ssh -p $PORT $SSH  -o StrictHostKeyChecking=no 'set -x; hostname;
+ root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1 }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
+ if [ -n "$root" ]; then grub-install $root; fi
+ if grep debian /etc/os-release; then update-grub; fi
+ if [ "'$BANG'" != "1" ]; then
+   echo "Want to update root passwd? ";  read A
+   if [ "$A" = "y" ]; then passwd root; fi
+ fi
+ echo "*** logout from `hostname -f`"'
 
 fi
 
