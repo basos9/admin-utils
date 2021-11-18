@@ -4,6 +4,11 @@
 - from system tar
   - backup with tar script   
 ```
+## backup to local directory (user backer or specified by -u)
+./back-sys-full.sh /var/backups/system
+## backup to remote ssh
+./back-sys-full.sh 
+## backup to pipe
 ./back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
 
 ```
@@ -17,7 +22,18 @@ tar c -p --ignore-failed-read \
 ```
 
 ### RESTORE
-- mount tar archivemount is slow, use ratarmount
+
+
+#### TAR PLAN 1: EXTRACT
+Extract with root
+```
+sudo tar xjf mars.tbz -C mars
+```
+
+#### TAR PLAN 2: MOUNT
+- mount tar archivemount is slow
+- mount tar  use ratarmount, presently (0.9.1) it does not preserve permissions
+
 - install ratarmount
 ```
 https://unix.stackexchange.com/questions/24032/faster-alternative-to-archivemount/501909
@@ -27,10 +43,14 @@ pip3 install --user ratarmount
 ```
 ratarmount  -o ro mars.tgz ma
 ```
-- restore from tar mounted with ratarmount
+
+
+### restore from tar 
+Tar extracted or mounted to directory ma
 ```
-### test
+### test (dry run)
 ./res-sys.sh -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
+
 ## DO
 ./res-sys.sh -c -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
 
