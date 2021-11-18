@@ -79,12 +79,16 @@ EOF
 
 "
 
+if [[ $DOA = 1 ]]; then
+  DO1=1; DO2=1; DO3=1; DO4=1;
+fi
+
 DOD=DRY
 if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
   xfer $SRC to $DST root $DST, 
   PHASE1: $DO1, PHASE2: $DO2, PHASE3: $DO3, PHASE4: $DO4
-  TWOPH $TWOF, BATCH $BANG, FIXONL $FIXO 
+  TWOPH $TWOF, BATCH $BANG,  
   rsync args $BARG $XARG"
 
 
@@ -96,9 +100,6 @@ if ! [[ $A =~ y|Y ]]; then
   exit  3
 fi
 
-if [[ $DOA = 1 ]]; then
-  DO1=1; DO2=1; DO3=1; DO4=1;
-fi
 
 
 
