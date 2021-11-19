@@ -1,16 +1,26 @@
 ## LIVE backup and restore
 
 ### BACKUP
-- from system tar
-  - backup with tar script   
+Create running system tar
+- backup system to local tar
 ```
 ## backup to local directory (user backer or specified by -u)
 ./back-sys-full.sh /var/backups/system
+```
+- backup system to remote ssh
+```
 ## backup to remote ssh
-./back-sys-full.sh 
+./back-sys-full.sh -r ssh://user@remote:port /
+```
+- backup system to pipe
+```
 ## backup to pipe
 ./back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
-
+```
+- reverse remote backup
+```
+## backup reverse
+ssh root@mars -p 1081 -o ExitOnForwardFailure=yes -R 1221:127.0.0.1:22 admin-utils/back-sys-full.sh -z bzip2 -r ssh://user@localhost:1221
 ```
 
 which executes
@@ -20,6 +30,8 @@ tar c -p --ignore-failed-read \
         --exclude='./root/w' --exclude='./var/*img' \
         --exclude=./var/lib/backups --exclude='$DESTP' $@ -C / ."
 ```
+
+
 
 ### RESTORE
 
