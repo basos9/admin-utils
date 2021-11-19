@@ -6,6 +6,7 @@ USER=backer
 ZIP=gzip
 ROOT=/
 STAMP=`date +%Y%m%d-%H%M`
+LOCK=/tmp/`basename $0`back.lock
 
 usage()
 {
@@ -48,9 +49,20 @@ NAME=$NAMEF.wip
 TAROPTS="c -p --ignore-failed-read \
         --exclude=./proc --exclude=./sys --exclude=./dev --exclude=./mnt/*
         --exclude='./root/w' --exclude='./var/*img' \
-        --exclude=./var/lib/backups  $XARGS -C $ROOT ." 
+        --exclude=./var/lib/backups --exclude='./$LOCK' $XARGS -C $ROOT ." 
 DEST=$OUTD/$NAME
 [ -z "$OUTD" ] && usage && exit 4
+if [ -f $LOCK ]; then
+  echo "* Lockfile $LOCK exitsts. Bye" >&2
+  exit 3
+fi
+onex()
+{
+  echo "* Exiting & unlocking" >&2
+  rm -f $LOCK || true
+}
+trap onex EXIT
+touch $LOCK || exit 4
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   echo "FILE mode, zip $ZIP, user $USER, Taring to $DEST " >&2
   if ! [ -d "$OUTD" ]; then
@@ -59,7 +71,7 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   fi
   DESTP=$(echo $DEST | sed 's/^\///')
   set -x
-  ionice -n 7 tar "$TAROPTS" --exclude="$DESTP" | \
+  ionice -n 7 tar $TAROPTS --exclude="$DESTP" | \
     /bin/bash -c "su $USER -c \"nice $ZIP >$DEST\" &&
     mv $DEST $OUTD/$NAMEF"
   r=$?
