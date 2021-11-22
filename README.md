@@ -1,4 +1,5 @@
 ## ADMIN UTILS
-Mostly debian based
+Mostly debian based various administration utilities.
 
-- Live system backup and restore: `back-sys` [README-back-sys](README-back-sys.md), [Files](back-sys)
+- BACK-SYS: Live system backup and restore: [README-back-sys](README-back-sys.md), [Files](back-sys)
+- CHROOT: Chroot utility: [README-chroot](README-chroot), [Files](chroot)

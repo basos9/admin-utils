@@ -5,23 +5,27 @@ Create running system tar
 - backup system to local tar
 ```
 ## backup to local directory (user backer or specified by -u)
-./back-sys-full.sh /var/backups/system
+back-sys/back-sys-full.sh /var/backups/system
 ```
 - backup system to remote ssh
 ```
 ## backup to remote ssh
-./back-sys-full.sh -r ssh://user@remote:port /
+back-sys/back-sys-full.sh -r ssh://user@remote:port /
 ```
 - backup system to pipe
 ```
 ## backup to pipe
-./back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
+back-sys/back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
 ```
 - reverse remote backup
 ```
 ## backup reverse
-ssh root@mars -p 1081 -o ExitOnForwardFailure=yes -R 1221:127.0.0.1:22 admin-utils/back-sys-full.sh -z bzip2 -r ssh://user@localhost:1221
+ssh root@mars -p 1081 -o ExitOnForwardFailure=yes -R 1221:127.0.0.1:22 admin-utils/back-sys/back-sys-full.sh -z bzip2 -r ssh://backer@localhost:1221 mars-auto
 ```
+  - connect to remote system (to be backed) mars user root with ssh at port 1081
+  - setup a reverse tunnel from mars to localhost via mars port 1221 (ensure fail on port forwarding fail)
+  - start the backup from remote root home admin-utils/back-sys/back-sys-full.sh backup to localhost user `backer` directory mars-auto
+  - as a bonus setup `backer` user as a chrooted user @see README-chroot / CHROOT for SSH access (busybox) `gpasswd -a backer sshchroot`
 
 which executes
 ```

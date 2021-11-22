@@ -1,14 +1,7 @@
 ### CROSS RESTORE NOTES
 THIS is experimental for now
 
-- test chroot
-```
-mount -t proc proc /rescue/proc
-mount -t sysfs sys /rescue/sys
-mount -o bind /dev /rescue/dev
-mount -t devpts pts /rescue/dev/pts
-sudo grub2-mkconfig -o $GRUB_CONFIG
-```
+
 - test move system folders
 ```
 find / -mindepth 1 -maxdepth 1 -regextype egrep ! -regex '/dev|/sys|/proc|/mnt|/vagrant.*'
