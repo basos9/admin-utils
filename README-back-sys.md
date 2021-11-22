@@ -20,12 +20,18 @@ back-sys/back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/
 - reverse remote backup
 ```
 ## backup reverse
-ssh root@mars -p 1081 -o ExitOnForwardFailure=yes -R 1221:127.0.0.1:22 admin-utils/back-sys/back-sys-full.sh -z bzip2 -r ssh://backer@localhost:1221 mars-auto
+ssh root@mars -p 1081 -o ExitOnForwardFailure=yes -R 1221:127.0.0.1:22 admin-utils/back-sys/back-sys-full.sh -z bzip2 -r ssh://backer@localhost:1221 sys-auto
 ```
   - connect to remote system (to be backed) mars user root with ssh at port 1081
   - setup a reverse tunnel from mars to localhost via mars port 1221 (ensure fail on port forwarding fail)
   - start the backup from remote root home admin-utils/back-sys/back-sys-full.sh backup to localhost user `backer` directory mars-auto
   - as a bonus setup `backer` user as a chrooted user @see README-chroot / CHROOT for SSH access (busybox) `gpasswd -a backer sshchroot`
+```
+# Mount directory to chroot
+mkdir /home/backer/chroot/home/backer/sys-auto
+vim /etc/fstab
+/var/backups/mars /home/backer/chroot/home/backer/sys-auto none bind 0 0
+```
 
 which executes
 ```

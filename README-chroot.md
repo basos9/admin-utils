@@ -18,7 +18,6 @@ vim /etc/ssh/sshd_config
 Match Group sshchroot
   ChrootDirectory %h/chroot
 
-
 ```
 
 
