@@ -21,7 +21,7 @@ if [ -z "$DIR" ] || ! [ -d $DIR ]; then
     usage
     exit 4
 fi
-if [ -n "$USER" ] || ! groups $USER; then
+if [ -z "$USER" ] || ! groups $USER; then
    echo "User $USER not found " >&2
    usage
    exit 5
@@ -63,6 +63,10 @@ echo > etc/passwd
 
 echo "* Copy binaries"
 mkdir -p bin
+if ldd /bin/busybox; then
+  echo "* /bin/busybox not static. Maybe apt-install busybox-static ? Bye"
+  exit 4
+fi
 cp -av /bin/busybox bin/busybox
 ln -sTf busybox bin/sh
 ln -sTf busybox bin/cat
