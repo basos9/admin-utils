@@ -68,8 +68,12 @@ ARET=0
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
 BARG="--super -aSDz"
 
-echo "Restore live system from backup (tar) with rsync
-It would be more covenient to setup ssh ControlMaster channel. 
+SARG="-p $PORT"
+SARG="$SARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
+
+echo "Restore live system from backup (tar) with rsync.
+This script uses ssh ControlMaster channel in ~/.ssh-res-sys-%C.
+If you would like to setup ssh ControlMaster channel. 
 Run the following:
 
 cat >> ~/.ssh/config <'EOF'
@@ -89,7 +93,7 @@ if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
   xfer $SRC to $DST root $DST
   PHASE1: $DO1  PHASE2: $DO2  PHASE3: $DO3  PHASE4: $DO4
-  TWOPH $TWOF BATCH $BANG DES
+  TWOPH $TWOF BATCH $BANG DES, SSH args $SARG
   rsync args $BARG $XARG"
 
 
@@ -108,7 +112,7 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
   set -x
-  ssh -p $PORT $SSH "set -e; echo '* Preparing $DST sysold sysnew'; mkdir -p $DST/sysold; mkdir -p $DST/sysnew; if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; exit 4; fi; cp -a $DST/etc $DST/sysold; echo 'Ok'"
+  ssh $SARG $SSH "set -e; echo '* Preparing $DST sysold sysnew'; mkdir -p $DST/sysold; mkdir -p $DST/sysnew; if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; exit 4; fi; cp -a $DST/etc $DST/sysold; echo 'Ok'"
   RT=$?; set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -125,7 +129,7 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1b: RSYNC $SRC/etc to $DEST/sysnew for reference"
   set -x
-  rsync $BARG --delete $SRC/etc/ $DEST/sysnew/etc/ -e "ssh -p $PORT"
+  rsync $BARG --delete $SRC/etc/ $DEST/sysnew/etc/ -e "ssh $SARG"
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 fi
@@ -133,7 +137,7 @@ fi
 if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
   echo
   echo "*** STEP 2 (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
-  rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh -p $PORT" $SRC $DEST/sysnew/
+  rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh $SARG" $SRC $DEST/sysnew/
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -167,12 +171,12 @@ if [[ $DO3 = 1 ]]; then
   fi
   echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces*"
   set -x
-  rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfing/network-scripts*' $XARG -e "ssh -p $PORT" $SRC/ $DEST
+  rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfig/network-scripts*' $XARG -e "ssh $SARG" $SRC/ $DEST
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
   echo "*** POST: DIFFING"
-  ssh -p $PORT $SSH -o StrictHostKeyChecking=no "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces"
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces"
 
   echo "*** SYNCED $ARET ***"
   echo "*** Check and sync them manually !!:"
@@ -191,9 +195,10 @@ fi
 if [[ $DO4 = 1 ]]; then
   echo
   echo "*** STEP 4: POST: fixings"
-  ssh -p $PORT $SSH  -o StrictHostKeyChecking=no 'set -x; hostname;
- root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1 }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
- if [ -n "$root" ]; then grub-install $root; fi
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  'set -x; hostname;
+ cat /proc/mounts > /etc/mtab
+ root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1; exit }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
+ if [ -n "$root" ]; then grub-install $root || grub-install /dev/sda; fi
  if grep debian /etc/os-release; then update-grub; fi
  if [ "'$BANG'" != "1" ]; then
    echo "Want to update root passwd? ";  read A
