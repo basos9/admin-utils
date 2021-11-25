@@ -70,6 +70,9 @@ BARG="--super -aSDz"
 
 SARG="-p $PORT"
 SARG="$SARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
+CSARG="-P $PORT"
+CSARG="$CSARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
+
 
 echo "Restore live system from backup (tar) with rsync.
 This script uses ssh ControlMaster channel in ~/.ssh-res-sys-%C.
@@ -93,7 +96,7 @@ if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
   xfer $SRC to $DST root $DST
   PHASE1: $DO1  PHASE2: $DO2  PHASE3: $DO3  PHASE4: $DO4
-  TWOPH $TWOF BATCH $BANG DES, SSH args $SARG
+  TWOPH $TWOF BATCH $BANG DES, SSH args $SARG, SCP args $CSARG
   rsync args $BARG $XARG"
 
 
@@ -112,7 +115,13 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
   set -x
-  ssh $SARG $SSH "set -e; echo '* Preparing $DST sysold sysnew'; mkdir -p $DST/sysold; mkdir -p $DST/sysnew; if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; exit 4; fi; cp -a $DST/etc $DST/sysold; echo 'Ok'"
+  ssh $SARG $SSH "set -e; echo '* Preparing $DST sysold sysnew'
+    mkdir -p $DST/sysold
+    mkdir -p $DST/sysnew
+    if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else cp -a $DST/etc $DST/sysold; fi
+    if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else cp -a $DST/boot $DST/sysold; fi
+    echo 'code '\$r;
+    exit \$r"
   RT=$?; set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -129,7 +138,13 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1b: RSYNC $SRC/etc to $DEST/sysnew for reference"
   set -x
-  rsync $BARG --delete $SRC/etc/ $DEST/sysnew/etc/ -e "ssh $SARG"
+  rsync $BARG --delete --delete-before $SRC/etc/ $DEST/sysnew/etc/ -e "ssh $SARG"
+  #scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
+  RT=$?;   set +x
+  [ "$RT" != "0" ] && ARET=$RT
+  set -x
+  rsync $BARG --delete --delete-before $SRC/boot/ $DEST/sysnew/boot/ -e "ssh $SARG"
+  #scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 fi
@@ -143,7 +158,7 @@ if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
 
   XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
 fi
-    
+
 if [ "$ARET" != "0" ];  then 
   A=y
   if [[ $BANG != 1 ]]; then
@@ -181,7 +196,8 @@ if [[ $DO3 = 1 ]]; then
   echo "*** SYNCED $ARET ***"
   echo "*** Check and sync them manually !!:"
   echo "*
-GRUB-INSTALL 
+GRUB-INSTALL
+KERNEL BOOT and initrd
 EXCLUDED /etc/fstab
 EXCLUDE /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
 ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
