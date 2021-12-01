@@ -54,16 +54,20 @@ sudo tar xjf mars.tbz -C mars
 
 #### TAR PLAN 2: MOUNT
 - mount tar archivemount is slow
-- mount tar  use ratarmount, presently (0.9.1) it does not preserve permissions
+- mount tar  use ratarmount, minimum version 0.9.2, as earlier versions do not preserve permissions
 
 - install ratarmount
 ```
 https://unix.stackexchange.com/questions/24032/faster-alternative-to-archivemount/501909
 pip3 install --user ratarmount
+# or to force install from upstream
+python3 -m pip install --user --force-reinstall git+https://github.com/mxmlnkn/ratarmount.git@v0.9.2
 ```
 - mount tar ratarmount
 ```
 ratarmount  -o ro mars.tgz ma
+# use parallel processors for bzip2
+ratarmount  -o ro -P 6 mars.tbz ma
 ```
 
 
