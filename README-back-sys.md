@@ -68,6 +68,8 @@ python3 -m pip install --user --force-reinstall git+https://github.com/mxmlnkn/r
 ratarmount  -o ro mars.tgz ma
 # use parallel processors for bzip2
 ratarmount  -o ro -P 6 mars.tbz ma
+# allow other users (and root) to read root files
+ratarmount -o ro,allow_other mars.tgz ma
 ```
 
 
