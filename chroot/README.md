@@ -19,7 +19,7 @@ EOF
 groupadd sshchroot
 systemctl restart sshd
 
-or for systems without sshd_config.d
+#or for systems without sshd_config.d
 vim /etc/ssh/sshd_config
 
 Match Group sshchroot
@@ -28,9 +28,9 @@ Match Group sshchroot
 
 Prepare a chroot for user backer
 ```
+gpasswd -a backer sshchroot
 mkdir -p /home/backer/chroot
 ./chroot/mkchro.sh /home/backer/chroot
-gpasswd -a backer sshchroot
 
 ```
 

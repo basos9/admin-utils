@@ -20,6 +20,7 @@ usage()
    -W disable tar warnings for changed files (disables --warning no-file-ignored --warning no-file-changed)
    -E exact, do not ignore tar exit code 1, meaning some files changed while being archived
    -r <[user@]hostname or ssh://[user@]hostname[:port]>
+	 -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
    -b <root> default /
 EOF
 }
@@ -27,7 +28,9 @@ EOF
 XARGS=
 TWARGS="" 
 SKIPE1=1
-while getopts “hz:t:u:r:b:WE” OPTION
+HOSTK=1
+SSHOPTS=
+while getopts “hz:t:u:r:b:WEH” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -38,6 +41,7 @@ do
          b)  ROOT="$OPTARG" ;;
          W)  TWARGS="--warning no-file-ignored --warning no-file-changed" ;;
          E)  SKIPE1=0 ;;
+				 H)  HOSTK=0 ;;
          ?)  usage; exit ;;
      esac
 done
@@ -107,11 +111,14 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   getps; r=$?
 
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
-  echo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1" >&2
+  echo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
+  if [ "$HOSTK" = "1" ]; then
+    SSHOPTS="${SSHOPTS}${SSHOPTS:+ }StrictHostKeyChecking=accept-new"
+  fi
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP | \
-    ssh $SSH "cat >$DEST" && ssh $SSH "mv $DEST $OUTD/$NAMEF"
+    ssh $SSHOPTS $SSH "cat >$DEST" && ssh $SSH "mv $DEST $OUTD/$NAMEF"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   getps; r=$?
