@@ -29,7 +29,15 @@ fi
 
 set -e
 cd $DIR
+
 echo "* Creating chroot on $BASE for user $USER"
+
+echo 
+chown -v root:root $DIR
+if [ -n "$USER" ]; then
+  HOMED=`getent passwd $USER | cut -d: -f 6`
+  chown -v root:root $HOMED
+fi
 
 if [[ $XTRA =~ dproc ]]; then
   echo "* Mounting directories dev,dev/pts,proc,sys"
@@ -73,9 +81,9 @@ ln -sTf busybox bin/cat
 
 if [ -n "$USER" ]; then
   echo "* Home directory for $USER"
-  mkdir -p home
-  mkdir -p home/$USER
-  chown $USER:$USER home/$USER
+  HOMEDC=`getent passwd $USER | cut -d: -f 6 | cut -d/ -f 2`
+  mkdir -p $HOMEDC
+  chown -R $USER:$USER $HOMEDC
   grep "^$USER:" /etc/passwd >> etc/passwd
 fi
 
