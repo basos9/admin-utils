@@ -7,18 +7,34 @@ Create chroot directory for basic usage (busybox shell, no libraries, no other b
 
 
 ## CHROOT for SSH access (busybox)
-For backup script we run the busybox sh (no need for libraries)
+
+Config system, add group sshchroot for chrooters
 ```
-mkdir -p /home/backer/chroot
-./chroot/mkchrot.sh /home/backer/chroot
+cat >/etc/ssh/sshd_config.d/sshchroot.conf <<'EOF'
+Match Group sshchroot
+  ChrootDirectory %h/chroot
+
+	Match All
+EOF
 groupadd sshchroot
-gpasswd -a backer sshchroot
+systemctl restart sshd
+
+or for systems without sshd_config.d
 vim /etc/ssh/sshd_config
 
 Match Group sshchroot
   ChrootDirectory %h/chroot
+```
+
+Prepare a chroot for user backer
+```
+mkdir -p /home/backer/chroot
+./chroot/mkchro.sh /home/backer/chroot
+gpasswd -a backer sshchroot
 
 ```
+
+
 
 
 ## CHROOT to running system
