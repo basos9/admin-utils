@@ -117,7 +117,7 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   techo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
   if [ "$HOSTK" = "1" ]; then
-    SSHOPTS="${SSHOPTS}${SSHOPTS:+ }StrictHostKeyChecking=accept-new"
+    SSHOPTS="${SSHOPTS}${SSHOPTS:+ }-oStrictHostKeyChecking=accept-new"
   fi
   set -x
   ionice -n 7 tar $TAROPTS | \
