@@ -25,6 +25,10 @@ usage()
 EOF
 }
 
+techo()
+{
+  echo "[`date +%Y%m%d-%H%M`][`hostname -f`][`basename $0`] $@"
+}
 XARGS=
 TWARGS="" 
 SKIPE1=1
@@ -53,12 +57,12 @@ shift 1
 [ -z "$OUTD" ] && usage && exit 4
 
 if [ -f $LOCK ]; then
-  echo "[*] Lockfile $LOCK exitsts. Bye" >&2
+  techo "[*] Lockfile $LOCK exitsts. Bye" >&2
   exit 3
 fi
 onex()
 {
-  echo "[+] Exiting & unlocking" >&2
+  techo "[+] Exiting & unlocking" >&2
   rm -f $LOCK || true
 }
 trap onex EXIT
@@ -88,18 +92,18 @@ getps(){
     rt=${R[$i]}
     if [ $i -eq 0 ] && [ "$rt" = "1" ] && [ "$SKIPE1" = "1" ]; then
       rt=0
-      echo "[*] Ignoring first command (tar) exit code of 1" >&2
+      techo "[*] Ignoring first command (tar) exit code of 1" >&2
     fi
     if [ "$rt" != "0" ]; then ret=$rt; fi
   done
-  echo "[+] Collected status of $total commands is $ret  (${R[@]})" >&2
+  techo "[+] Collected status of $total commands is $ret  (${R[@]})" >&2
   return $ret
 }
 
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
-  echo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST, ignore changed $SKIPE1 " >&2
+  techo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST, ignore changed $SKIPE1 " >&2
   if ! [ -d "$OUTD" ]; then
-    echo "[*] DIR not found $OUTD" >&2
+    techo "[*] DIR not found $OUTD" >&2
     exit 4
   fi
   set -x
@@ -111,7 +115,7 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   getps; r=$?
 
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
-  echo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
+  techo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
   if [ "$HOSTK" = "1" ]; then
     SSHOPTS="${SSHOPTS}${SSHOPTS:+ }StrictHostKeyChecking=accept-new"
   fi
@@ -124,7 +128,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   getps; r=$?
 
 else
- echo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1" >&2
+ techo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1" >&2
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP
@@ -134,7 +138,7 @@ else
 fi
 # --ignore-command-error --ignore-failed-read
 if [ "$r" != "0" ]; then 
-  echo "[*] FAILED (code $r) ($r1)" >&2; exit $r;
+  techo "[*] FAILED (code $r) ($r1)" >&2; exit $r;
 else
-  echo "[+] SUCCESS (code $r) ($r1)" >&2
+  techo "[+] SUCCESS (code $r) ($r1)" >&2
 fi
