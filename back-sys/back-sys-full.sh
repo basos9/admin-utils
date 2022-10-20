@@ -21,6 +21,7 @@ usage()
    -E exact, do not ignore tar exit code 1, meaning some files changed while being archived
    -r <[user@]hostname or ssh://[user@]hostname[:port]>
 	 -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
+	 -P enable password authentication
    -b <root> default /
 EOF
 }
@@ -33,8 +34,9 @@ XARGS=
 TWARGS="" 
 SKIPE1=1
 HOSTK=1
+PASSAUTH=
 SSHOPTS=
-while getopts “hz:t:u:r:b:WEH” OPTION
+while getopts “hz:t:u:r:b:WEHP” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -46,6 +48,7 @@ do
          W)  TWARGS="--warning no-file-ignored --warning no-file-changed" ;;
          E)  SKIPE1=0 ;;
 				 H)  HOSTK=0 ;;
+				 P)  PASSAUTH=1 ;;
          ?)  usage; exit ;;
      esac
 done
@@ -119,12 +122,22 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   if [ "$HOSTK" = "1" ]; then
     SSHOPTS="${SSHOPTS}${SSHOPTS:+ }-oStrictHostKeyChecking=accept-new"
   fi
+  if [ "$PASSAUTH" != "1" ]; then
+    SSHOPTS="${SSHOPTS}${SSHOPTS:+ }-oPasswordAuthentication=no"
+  fi
+ 
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP | \
     ssh $SSHOPTS $SSH "cat >$DEST" && ssh $SSH "mv $DEST $OUTD/$NAMEF"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
+  if [ ${R[2]} == 255 ]; then
+    techo "[*] Maybe ssh public key not registered for $SSH. Dumping key." >&2
+    set -x
+    cat ~/.ssh/id_rsa.pub >&2
+    set +x
+  fi
   getps; r=$?
 
 else
