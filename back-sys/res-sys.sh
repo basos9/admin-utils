@@ -115,12 +115,16 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
   set -x
-  ssh $SARG $SSH "set -e; echo '* Preparing $DST sysold sysnew'
+  ssh $SARG $SSH "set -e; echo \"* [\`date +%Y%m%d-%H%M\`][\`hostname -f\`] Preparing $DST sysold sysnew\"
     mkdir -p $DST/sysold
     mkdir -p $DST/sysnew
     if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else cp -a $DST/etc $DST/sysold; fi
     if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else cp -a $DST/boot $DST/sysold; fi
-    echo 'code '\$r;
+    ke=\`uname -r\`
+    echo \"RunningKernel $ke\"
+    mkdir -p $DST/sysold/lib/modules
+    if [ -d $DST/sysold/lib/modules/\$ke ]; then echo \"Already existing $DST/sysold/lib/modules/\$ke. Bye\"; r=6; else cp -a $DST/lib/modules/\$ke $DST/sysold/lib/modules/\$ke; fi
+    echo \"code \$r\";
     exit \$r"
   RT=$?; set +x
   [ "$RT" != "0" ] && ARET=$RT
@@ -142,11 +146,11 @@ if [[ $DO1 = 1 ]]; then
   #scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
-  set -x
-  rsync $BARG --delete --delete-before $SRC/boot/ $DEST/sysnew/boot/ -e "ssh $SARG"
-  #scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
-  RT=$?;   set +x
-  [ "$RT" != "0" ] && ARET=$RT
+  #set -x
+  #rsync $BARG --delete --delete-before $SRC/boot/ $DEST/sysnew/boot/ -e "ssh $SARG"
+  ##scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
+  #RT=$?;   set +x
+  #[ "$RT" != "0" ] && ARET=$RT
 fi
 
 if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
@@ -184,7 +188,15 @@ if [[ $DO3 = 1 ]]; then
   if [[ $DO = 1 ]]; then
     echo "*** NOW WE ARE MAKING A NEW SYSTEM"
   fi
+
   echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces*"
+
+  ker=`ssh $SARG $SSH "uname -r"`
+  RT=$?
+  if [ "$RT" != "0" ] && [ -n "$ker" ]; then
+    echo "* Excluding running kernel $ker modules, boot stuff, keeping grub.conf"
+    XARG="$XARG --exclude '/boot/*$ker*' --exclude '/lib/modules/$ker' --exclude '/boot/grub/grub.cfg"
+  fi
   set -x
   rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfig/network-scripts*' $XARG -e "ssh $SARG" $SRC/ $DEST
   RT=$?;   set +x
@@ -194,10 +206,14 @@ if [[ $DO3 = 1 ]]; then
   ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces"
 
   echo "*** SYNCED $ARET ***"
+  if [[ $XARG =~ grub.cfg ]]; then
+    echo "*** We kept grub and kernel config. If you want to use new run 'cp -v /sysnew/boot/grub/grub.cfg /boot'"
+  fi
   echo "*** Check and sync them manually !!:"
   echo "*
 GRUB-INSTALL
 KERNEL BOOT and initrd
+KERNEL MODULES
 EXCLUDED /etc/fstab
 EXCLUDE /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
 ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
