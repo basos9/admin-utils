@@ -14,8 +14,13 @@ cat >/etc/ssh/sshd_config.d/sshchroot.conf <<'EOF'
 Match Group sshchroot
   ChrootDirectory %h/chroot
 
-	Match All
+Match All
 EOF
+
+sed -re 's/^(Subsystem\s+sftp\s+).*/\1internal-sftp/' -i /etc/ssh/sshd_config
+# such as there is a directive
+Subsystem	sftp	internal-sftp
+
 groupadd sshchroot
 systemctl restart sshd
 
