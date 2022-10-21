@@ -111,11 +111,14 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   fi
   set -x
   ionice -n 7 tar  $TAROPTS | \
-    /bin/bash -c "su $USER -c \"nice $ZIP >$DEST\" &&
-    mv $DEST $OUTD/$NAMEF"
+    /bin/bash -c "su $USER -c \"nice $ZIP >$DEST\""
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   getps; r=$?
+  if [[ $r = 0 ]]; then
+    mv "$DEST" "$OUTD/$NAMEF"
+    r=$?
+  fi
 
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   techo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
@@ -129,7 +132,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP | \
-    ssh $SSHOPTS $SSH "cat >$DEST" && ssh $SSH "mv $DEST $OUTD/$NAMEF"
+    ssh $SSHOPTS $SSH "cat >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   if [ ${R[2]} == 255 ]; then
@@ -139,6 +142,10 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
     set +x
   fi
   getps; r=$?
+  if [[ $r = 0 ]]; then
+    ssh $SSH $SSHOPTS "mv $DEST $OUTD/$NAMEF"
+    r=$?
+  fi
 
 else
  techo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1" >&2
