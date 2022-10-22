@@ -132,7 +132,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP | \
-    ssh $SSHOPTS $SSH "cat >$DEST"
+    ssh $SSHOPTS $SSH "[ -d \"$OUTD\" ] || { echo \"Creating dir $OUTD\" && mkdir -p \"$OUTD\"; }; cat >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   if [ ${R[2]} == 255 ]; then
