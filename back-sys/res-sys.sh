@@ -3,6 +3,7 @@
 SRC=.
 PORT=22
 XARG=""
+SKARG=
 DO=0
 TWOF=
 BANG=
@@ -21,18 +22,21 @@ usage()
    -c  DO it, else dry run
    -v  verbose
    -d  Delete
+   -e  Rsync --exclude  (e.g. -e '/vagrant*')
    -o  Extra rsync options
+   -O  Extra ssh/scp options
+   -H  SSH/SCP no strictHostKeyChecking
    -S  SRC dir, default $BASE
-   -T  Run two phase, excluding /bin /sbin /lib
+   -T  Run two phase, excluding /bin /sbin /lib, **EXPERIMENTAL CROSS DISTRO**
    -B  BANG! Dont stop on errors
    -1  Prepare only, copy to /sysold and /sysnew (Step 1)
-   -3  Copy phanse only (Step 3)
+   -3  Copy only (Step 3)
    -4  FIX only (Step 4)"
 EOF
    ## -r  Running system, exclude things
 }
 
-while getopts “hp:cvdo:S:TB1234” OPTION
+while getopts “hp:cvdo:S:TB1234HO:e:” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -40,7 +44,10 @@ do
          c)  DO=1 ;;
          v)  XARG="$XARG -v" ; DES="$DES VERB 1" ;;
          d)  XARG="$XARG --delete" DES="$DES DEL 1";;
+         e)  XARG="$XARG --exclude $OPTARG";;
          o)  XARG="$XARG $OPTARG";;
+         O)  SKARG="$SKARG $OPTARG";;
+         H)  SKARG="$SKARG -oStrictHostKeyChecking=no"; DES="$DES STRICTH 0" ;;
          S)  SRC="$OPTARG" ;;
          T)  TWOF=1 ;;
          B)  BANG=1 ;;
@@ -68,9 +75,9 @@ ARET=0
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
 BARG="--super -aSDz"
 
-SARG="-p $PORT"
+SARG="$SKARG -p $PORT"
 SARG="$SARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
-CSARG="-P $PORT"
+CSARG="$SKARG -P $PORT"
 CSARG="$CSARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
 
 
@@ -95,7 +102,7 @@ DOD=DRY
 if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
   xfer $SRC to $DST root $DST
-  PHASE1: $DO1  PHASE2: $DO2  PHASE3: $DO3  PHASE4: $DO4
+  STEP1: $DO1  STEP2: $DO2  STEP3: $DO3  STEP4: $DO4
   TWOPH $TWOF BATCH $BANG DES, SSH args $SARG, SCP args $CSARG
   rsync args $BARG $XARG"
 
@@ -121,7 +128,7 @@ if [[ $DO1 = 1 ]]; then
     if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else cp -a $DST/etc $DST/sysold; fi
     if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else cp -a $DST/boot $DST/sysold; fi
     ke=\`uname -r\`
-    echo \"RunningKernel $ke\"
+    echo \"RunningKernel \$ke\"
     mkdir -p $DST/sysold/lib/modules
     if [ -d $DST/sysold/lib/modules/\$ke ]; then echo \"Already existing $DST/sysold/lib/modules/\$ke. Bye\"; r=6; else cp -a $DST/lib/modules/\$ke $DST/sysold/lib/modules/\$ke; fi
     echo \"code \$r\";
@@ -198,7 +205,7 @@ if [[ $DO3 = 1 ]]; then
     XARG="$XARG --exclude '/boot/*$ker*' --exclude '/lib/modules/$ker' --exclude '/boot/grub/grub.cfg"
   fi
   set -x
-  rsync $BARG --exclude '/sys*' --exclude '/proc/' --exclude '/dev/' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfig/network-scripts*' $XARG -e "ssh $SARG" $SRC/ $DEST
+  rsync $BARG --exclude '/sys/*' --exclude '/proc/' --exclude '/dev/' --exclude '/tmp/*' --exclude '/run/*' --exclude '/var/run/*' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfig/network-scripts*' $XARG -e "ssh $SARG" $SRC/ $DEST
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -209,7 +216,12 @@ if [[ $DO3 = 1 ]]; then
   if [[ $XARG =~ grub.cfg ]]; then
     echo "*** We kept grub and kernel config. If you want to use new run 'cp -v /sysnew/boot/grub/grub.cfg /boot'"
   fi
-  echo "*** Check and sync them manually !!:"
+  ke=`uname -r`
+  echo "** For keeping existing kernel do
+cp -av /sysold/boot/vmlinuz-$ke /sysold/boot/initrd.img-$ke /boot/
+cp -av /sysold/lib/modules/$ke /lib/modules/
+  "
+  echo "*** Check. Maybe fix them manually (if not ok STEP 4) !!:"
   echo "*
 GRUB-INSTALL
 KERNEL BOOT and initrd
@@ -229,12 +241,18 @@ if [[ $DO4 = 1 ]]; then
   echo "*** STEP 4: POST: fixings"
   ssh $SARG -o StrictHostKeyChecking=no $SSH  'set -x; hostname;
  cat /proc/mounts > /etc/mtab
+ echo "* Fixing grub-install"
  root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1; exit }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
  if [ -n "$root" ]; then grub-install $root || grub-install /dev/sda; fi
  if grep debian /etc/os-release; then update-grub; fi
+
+ echo "* Fixing root passwd"
  if [ "'$BANG'" != "1" ]; then
    echo "Want to update root passwd? ";  read A
    if [ "$A" = "y" ]; then passwd root; fi
+ else
+   echo " Locking root pwd"
+   passwd -l root
  fi
  echo "*** logout from `hostname -f`"'
 

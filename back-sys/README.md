@@ -77,11 +77,11 @@ ratarmount -o ro,allow_other mars.tgz ma
 Tar extracted or mounted to directory ma
 ```
 ### test (dry run)
-./res-sys.sh -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
+./res-sys.sh -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11-dry.log
 
 ## DO
 ./res-sys.sh -c -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
-
+./res-sys.sh -e '/vagrant*' -c -v -d -S mars.tar root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
 ```
 
 which executes finally
@@ -95,6 +95,8 @@ Things to consider afterwards
 - grub install and update-grub
 - fstab
 - networking
+
+NOTE: Vagrantfile-res-test is an example to test restore in a vagrant box
 
 ### Usefull commands
 - list tar contents
