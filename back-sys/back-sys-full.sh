@@ -84,13 +84,13 @@ NAME=$NAMEF.wip
 DEST=$OUTD/$NAME
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   DESTP=$(echo $DEST | sed 's/^\//.\//')
-  XARGS="--exclude=\"$DESTP\"  $XARGS"
+  XARGS="--exclude=$DESTP  $XARGS"
 fi
 TAROPTS="c -p $TWARGS
         --exclude=./proc --exclude=./sys
-        --exclude='./mnt/*' --exclude='./media/*' --exclude=./var/lib/backups
-        --exclude='./root/w' --exclude='./var/swap*' 
-        --exclude='./$LOCK' $XARGS -C $ROOT ." 
+        --exclude=./mnt/* --exclude=./media/* --exclude=./var/lib/backups
+        --exclude=./root/w --exclude=./var/swap* 
+        --exclude=./$LOCK $XARGS -C $ROOT ." 
 
 getps(){
   local total=${#R[*]}
