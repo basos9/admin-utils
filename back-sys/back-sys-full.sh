@@ -44,7 +44,7 @@ do
          h)  usage; exit 1 ;;
          z)  ZIP=$OPTARG  ;;
          t)  XARGS="$XARGS $OPTARG" ;;
-         e)  XARGS="$XARGS --exclude '${OPTARG/#\//.\/}'";;
+         e)  XARGS="$XARGS --exclude ${OPTARG/#\//.\/}";;
          x)  XARGS="$XARGS --one-file-system" ;;
          u)  USER=$OPTARG ;;
          r)  SSH=$OPTARG ;;
