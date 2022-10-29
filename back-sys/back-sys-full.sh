@@ -17,11 +17,13 @@ usage()
    -z <zipprog>, default gzip
    -u <user> 
    -t <tarargs>
+   -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
+   -x pass --one-file-system to tar
    -W disable tar warnings for changed files (disables --warning no-file-ignored --warning no-file-changed)
    -E exact, do not ignore tar exit code 1, meaning some files changed while being archived
    -r <[user@]hostname or ssh://[user@]hostname[:port]>
-	 -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
-	 -P enable password authentication
+   -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
+   -P enable password authentication
    -b <root> default /
 EOF
 }
@@ -36,19 +38,21 @@ SKIPE1=1
 HOSTK=1
 PASSAUTH=
 SSHOPTS=
-while getopts “hz:t:u:r:b:WEHP” OPTION
+while getopts “hz:t:u:r:b:WEHPe:x” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
          z)  ZIP=$OPTARG  ;;
          t)  XARGS="$XARGS $OPTARG" ;;
+         e)  XARGS="$XARGS --exclude '${OPTARG/#\/E/.\/}'";;
+         x)  XARGS="$XARGS --one-file-system" ;;
          u)  USER=$OPTARG ;;
          r)  SSH=$OPTARG ;;
          b)  ROOT="$OPTARG" ;;
          W)  TWARGS="--warning no-file-ignored --warning no-file-changed" ;;
          E)  SKIPE1=0 ;;
-				 H)  HOSTK=0 ;;
-				 P)  PASSAUTH=1 ;;
+         H)  HOSTK=0 ;;
+         P)  PASSAUTH=1 ;;
          ?)  usage; exit ;;
      esac
 done
@@ -83,9 +87,10 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   XARGS="--exclude="$DESTP"  $XARGS"
 fi
 TAROPTS="c -p $TWARGS
-        --exclude=./proc --exclude=./sys --exclude=./dev --exclude=./mnt/*
+        --exclude=./proc --exclude=./sys
+        --exclude='./mnt/*' --exclude='./media/*' --exclude=./var/lib/backups
         --exclude='./root/w' --exclude='./var/*img' 
-        --exclude=./var/lib/backups --exclude='./$LOCK' $XARGS -C $ROOT ." 
+        --exclude='./$LOCK' $XARGS -C $ROOT ." 
 
 getps(){
   local total=${#R[*]}
