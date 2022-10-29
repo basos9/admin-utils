@@ -44,7 +44,7 @@ do
          h)  usage; exit 1 ;;
          z)  ZIP=$OPTARG  ;;
          t)  XARGS="$XARGS $OPTARG" ;;
-         e)  XARGS="$XARGS --exclude '${OPTARG/#\/E/.\/}'";;
+         e)  XARGS="$XARGS --exclude '${OPTARG/#\//.\/}'";;
          x)  XARGS="$XARGS --one-file-system" ;;
          u)  USER=$OPTARG ;;
          r)  SSH=$OPTARG ;;
@@ -83,13 +83,13 @@ NAMEF=sys-full-`hostname`-$STAMP.$EXT
 NAME=$NAMEF.wip
 DEST=$OUTD/$NAME
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
-  DESTP=$(echo $DEST | sed 's/^\///')
-  XARGS="--exclude="$DESTP"  $XARGS"
+  DESTP=$(echo $DEST | sed 's/^\//.\//')
+  XARGS="--exclude=\"$DESTP\"  $XARGS"
 fi
 TAROPTS="c -p $TWARGS
         --exclude=./proc --exclude=./sys
         --exclude='./mnt/*' --exclude='./media/*' --exclude=./var/lib/backups
-        --exclude='./root/w' --exclude='./var/*img' 
+        --exclude='./root/w' --exclude='./var/swap*' 
         --exclude='./$LOCK' $XARGS -C $ROOT ." 
 
 getps(){
