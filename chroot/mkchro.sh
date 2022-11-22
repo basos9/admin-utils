@@ -78,6 +78,7 @@ fi
 cp -av /bin/busybox bin/busybox
 ln -sTf busybox bin/sh
 ln -sTf busybox bin/cat
+ln -sTf busybox bin/grep
 
 if [ -n "$USER" ]; then
   echo "* Home directory for $USER"
