@@ -2,11 +2,16 @@
 #1.2
 BASE=$(readlink -f `dirname $0`)
 
-USER=backer
+USER=
 ZIP=gzip
 ROOT=/
 STAMP=`date +%Y%m%d-%H%M`
 LOCK=/tmp/`basename $0`back.lock
+
+techo()
+{
+  echo "[`date +%Y%m%d-%H%M`][`hostname -f`][`basename $0`] $@"
+}
 
 usage()
 {
@@ -15,7 +20,9 @@ usage()
   Output folder to create system backup, user via -u, e.g. $0 /var/lib/backups
   OR - to pipe to stdout e.g. $0 - bzip2 | ssh -p 2222 user@host 'cat > /mnt/data/host.tbz'
    -z <zipprog>, default gzip
-   -u <user> 
+   -u <user>. user writing files, for local mode, default current user
+   -k <keeplast>, keep this number of backups, default keep all, for local and remote modes
+   -s, use sh mode for -k, also needs grep and ls, use in busybox chroots
    -t <tarargs>
    -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
    -x pass --one-file-system to tar
@@ -28,17 +35,15 @@ usage()
 EOF
 }
 
-techo()
-{
-  echo "[`date +%Y%m%d-%H%M`][`hostname -f`][`basename $0`] $@"
-}
 XARGS=
 TWARGS="" 
 SKIPE1=1
 HOSTK=1
 PASSAUTH=
 SSHOPTS=
-while getopts “hz:t:u:r:b:WEHPe:x” OPTION
+KEEPLAST=
+SH=
+while getopts “hz:t:u:r:b:WEHPe:xk:s” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -52,6 +57,8 @@ do
          W)  TWARGS="--warning no-file-ignored --warning no-file-changed" ;;
          E)  SKIPE1=0 ;;
          H)  HOSTK=0 ;;
+         k)  KEEPLAST=$OPTARG; ! [[ $KEEPLAST -ge 0 ]] && techo "Invalid arg -k" >&2 ;;
+         s)  SH=1 ;;
          P)  PASSAUTH=1 ;;
          ?)  usage; exit ;;
      esac
@@ -114,15 +121,30 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
     techo "[*] DIR not found $OUTD" >&2
     exit 4
   fi
+  SU="bash -c"
+  if [ -n "$USER" ]; then
+    SU="su $USER -c"
+  fi
   set -x
   ionice -n 7 tar  $TAROPTS | \
-    /bin/bash -c "su $USER -c \"nice $ZIP >$DEST\""
+    $SU "nice $ZIP >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   getps; r=$?
   if [[ $r = 0 ]]; then
     mv "$DEST" "$OUTD/$NAMEF"
     r=$?
+  fi
+  if [[ $r == 0 ]] && [ -n "$KEEPLAST" ] && [ $KEEPLAST -ge 0 ]; then
+    kf=$KEEPLAST
+    pushd $OUTD || exit 4
+    techo "[+] Keeping latest $kf files *.*z, sorted by moddate"
+    declare -a a
+    a=(`ls -1t -p *z | grep -v /$`)
+    techo "[++] ALL FILES ${#a[@]} ::: ${a[@]}";
+    for i in `seq $kf $((${#a[@]}-1))`; do f=${a[$i]};  $SU "rm -fv \"$f\"" ; done
+    r=$?
+    popd
   fi
 
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
@@ -137,7 +159,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   set -x
   ionice -n 7 tar $TAROPTS | \
     nice $ZIP | \
-    ssh $SSHOPTS $SSH "[ -d \"$OUTD\" ] || { echo \"Creating dir $OUTD\" && mkdir -p \"$OUTD\"; }; cat >$DEST"
+    ssh $SSHOPTS $SSH "[ -d \"$OUTD\" ] || { echo \"[\`hostname -f\`] Creating dir $OUTD\" && mkdir -p \"$OUTD\"; }; cat >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   if [ ${R[2]} == 255 ]; then
@@ -149,6 +171,32 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   getps; r=$?
   if [[ $r = 0 ]]; then
     ssh $SSH $SSHOPTS "mv $DEST $OUTD/$NAMEF"
+    r=$?
+  fi
+  if [[ $r == 0 ]] && [ -n "$KEEPLAST" ] && [ $KEEPLAST -ge 0 ]; then
+    # NOTE: pushd maybe not available in chroot
+    if ! [[ $SH = 1 ]]; then
+      ssh $SSH $SSHOPTS 'kf='$KEEPLAST'
+    cd '$OUTD' || exit 4
+    echo "[`hostname -f`][+] Keeping latest $kf files *.*z, BASH, sorted by moddate"
+    declare -a a
+    a=(`ls -1t -p *z | grep -v /$`)
+    echo "[++] ALL FILES ${#a[@]} ::: ${a[@]}";
+    for i in `seq $kf $((${#a[@]}-1))`; do f=${a[$i]}; rm -fv "$f" ; done
+    '
+    else
+      ssh $SSH $SSHOPTS 'kf='$KEEPLAST'
+    set -e
+    cd '$OUTD' || exit 4
+    echo "[+] Keeping latest $kf files *.*z, SH/GREP/LS sorted by moddate"
+    a=`ls -1t -p *z | grep -v /$`
+    echo "[++] ALL FILES ${a}";
+    n=0
+    for f in ${a}; do n=$(($n+1)); done
+    i=0
+    for f in ${a}; do if [ $i -ge $kf ] && [ $i -lt $n ]; then rm -fv "$f" ; fi; i=$(($i+1)); done
+    '
+    fi
     r=$?
   fi
 
