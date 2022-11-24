@@ -82,7 +82,7 @@ ln -sTf busybox bin/grep
 
 if [ -n "$USER" ]; then
   echo "* Home directory for $USER"
-  HOMEDC=`getent passwd $USER | cut -d: -f 6 | cut -d/ -f 2`
+  HOMEDC=`getent passwd $USER | cut -d: -f 6 | cut -d/ -f 2-`
   mkdir -p $HOMEDC
   chown -R $USER:$USER $HOMEDC
   grep "^$USER:" /etc/passwd >> etc/passwd
