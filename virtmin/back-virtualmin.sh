@@ -23,6 +23,7 @@ EOF
 
 }
 
+VIRTUALMIN=/usr/sbin/virtualmin
 SH=
 DOV=1
 SSHOPTS=
@@ -87,7 +88,7 @@ BACKNAME=$(date +%Y%m%d-%H%M)
   if [ "$DOV" = "1" ]; then
   techo "[+] Taking virtmin backup local @ `hostname -f`";
   set -x
-  virtualmin backup-domain --dest /var/backups/virtualmin/ --newformat --compression bzip2 --all-features --ignore-errors --all-domains; r=$?; 
+  $VIRTUALMIN backup-domain --dest /var/backups/virtualmin/ --newformat --compression bzip2 --all-features --ignore-errors --all-domains; r=$?; 
   set +x
   if [ "$r" != "0" ]; then
     techo "[*] ERROR taking virtualmin local backup. CODE: $r. Bye" >&2
