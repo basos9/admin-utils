@@ -19,6 +19,7 @@ usage()
   Usage: $0 [opt] <outd|->
   Output folder to create system backup, user via -u, e.g. $0 /var/lib/backups
   OR - to pipe to stdout e.g. $0 - bzip2 | ssh -p 2222 user@host 'cat > /mnt/data/host.tbz'
+  Default exclusions apply
    -z <zipprog>, default gzip
    -u <user>. user writing files, for local mode, default current user
    -k <keeplast>, keep this number of backups, default keep all, for local and remote modes
@@ -32,6 +33,7 @@ usage()
    -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
    -P enable password authentication
    -b <root> default /
+   -c <pass-option> encrypt with openssl enc, argument is -pass argument of openssl enc or "ask" or "-" for interactive
 EOF
 }
 
@@ -43,7 +45,10 @@ PASSAUTH=
 SSHOPTS=
 KEEPLAST=
 SH=
-while getopts “hz:t:u:r:b:WEHPe:xk:s” OPTION
+ENCR=
+ENCR_PARG=
+ENCR_ARG="-pbkdf2 -aes256 -e"
+while getopts "hz:t:u:r:b:WEHPe:xk:sc:" OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -60,15 +65,18 @@ do
          k)  KEEPLAST=$OPTARG; ! [[ $KEEPLAST -ge 0 ]] && techo "Invalid arg -k" >&2 ;;
          s)  SH=1 ;;
          P)  PASSAUTH=1 ;;
+         c)  ENCR="openssl enc" ; [[ $OPTARG != "ask" ]] && [[ $OPTARG != "-" ]] && ENCR_PARG="-pass $OPTARG" ;;
          ?)  usage; exit ;;
      esac
 done
 shift $(( $OPTIND - 1 ))
 set -o pipefail
 
+
 OUTD="$1"
 shift 1
 [ -z "$OUTD" ] && usage && exit 4
+
 
 if [ -f $LOCK ]; then
   techo "[*] Lockfile $LOCK exitsts. Bye" >&2
@@ -86,6 +94,9 @@ EXT=tgz
 if [[ $ZIP =~ bz ]]; then
   EXT=tbz
 fi
+if [ -n "$ENCR" ]; then
+  EXT="$EXT.cr"
+fi
 NAMEF=sys-full-`hostname`-$STAMP.$EXT
 NAME=$NAMEF.wip
 DEST=$OUTD/$NAME
@@ -96,8 +107,13 @@ fi
 TAROPTS="c -p $TWARGS
         --exclude=./proc --exclude=./sys
         --exclude=./mnt/* --exclude=./media/* --exclude=./var/lib/backups
-        --exclude=./root/w --exclude=./var/swap* 
-        --exclude=./$LOCK $XARGS -C $ROOT ." 
+        --exclude=./root/w --exclude=./var/swap*
+        --exclude=./$LOCK $XARGS -C $ROOT ."
+
+if [ -n "$ENCR" ]; then
+  ENCR="$ENCR $ENCR_ARG $ENCR_PARG"
+fi
+ENCRP="${ENCR:+ | }$ENCR"
 
 getps(){
   local total=${#R[*]}
@@ -116,7 +132,7 @@ getps(){
 }
 
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
-  techo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST, ignore changed $SKIPE1 " >&2
+  techo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST, ignore changed $SKIPE1, Enc $ENCR" >&2
   if ! [ -d "$OUTD" ]; then
     techo "[*] DIR not found $OUTD" >&2
     exit 4
@@ -127,7 +143,7 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   fi
   set -x
   ionice -n 7 tar  $TAROPTS | \
-    $SU "nice $ZIP >$DEST"
+    nice $SU "$ZIP $ENCRP >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   getps; r=$?
@@ -135,12 +151,15 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
     mv "$DEST" "$OUTD/$NAMEF"
     r=$?
   fi
+  if [[ $r == 0 ]]; then
+    techo "[+] Finished to $OUTD/$NAMEF"
+  fi
   if [[ $r == 0 ]] && [ -n "$KEEPLAST" ] && [ $KEEPLAST -ge 0 ]; then
     kf=$KEEPLAST
     pushd $OUTD || exit 4
-    techo "[+] Keeping latest $kf files *.*z, sorted by moddate"
+    techo "[+] Keeping latest $kf files (*tbz,*tgz,*wip,*cr), sorted by moddate"
     declare -a a
-    a=(`ls -1t -p *z | grep -v /$`)
+    a=(`ls -1t -p {*.tbz,*.tgz,*.wip,*.cr} 2>/dev/null | grep -v /$`)
     techo "[++] ALL FILES ${#a[@]} ::: ${a[@]}";
     for i in `seq $kf $((${#a[@]}-1))`; do f=${a[$i]};  $SU "rm -fv \"$f\"" ; done
     r=$?
@@ -148,17 +167,17 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   fi
 
 elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
-  techo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK" >&2
+  techo "[+] REMOTE mode, zip $ZIP, ssh to $SSH, taring to remote dest $DEST, ignore changed $SKIPE1, accept new hosts: $HOSTK, Enc: $ENCR" >&2
   if [ "$HOSTK" = "1" ]; then
     SSHOPTS="${SSHOPTS}${SSHOPTS:+ }-oStrictHostKeyChecking=accept-new"
   fi
   if [ "$PASSAUTH" != "1" ]; then
     SSHOPTS="${SSHOPTS}${SSHOPTS:+ }-oPasswordAuthentication=no"
   fi
- 
+
   set -x
   ionice -n 7 tar $TAROPTS | \
-    nice $ZIP | \
+    nice bash -c "$ZIP $ENCRP" | \
     ssh $SSHOPTS $SSH "[ -d \"$OUTD\" ] || { echo \"[\`hostname -f\`] Creating dir $OUTD\" && mkdir -p \"$OUTD\"; }; cat >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
@@ -173,14 +192,18 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
     ssh $SSH $SSHOPTS "mv $DEST $OUTD/$NAMEF"
     r=$?
   fi
+  if [[ $r == 0 ]]; then
+    techo "[+] Finished to $OUTD/$NAMEF"
+  fi
   if [[ $r == 0 ]] && [ -n "$KEEPLAST" ] && [ $KEEPLAST -ge 0 ]; then
     # NOTE: pushd maybe not available in chroot
     if ! [[ $SH = 1 ]]; then
       ssh $SSH $SSHOPTS 'kf='$KEEPLAST'
     cd '$OUTD' || exit 4
-    echo "[`hostname -f`][+] Keeping latest $kf files *.*z, BASH, sorted by moddate"
+
+    echo "[`hostname -f`][+] Keeping latest $kf files (*tbz,*tgz,*wip,*cr), BASH, sorted by moddate"
     declare -a a
-    a=(`ls -1t -p *z | grep -v /$`)
+    a=(`ls -1t -p {*.tbz,*.tgz,*.wip,*.cr} 2>/dev/null | grep -v /$`)
     echo "[++] ALL FILES ${#a[@]} ::: ${a[@]}";
     for i in `seq $kf $((${#a[@]}-1))`; do f=${a[$i]}; rm -fv "$f" ; done
     '
@@ -188,8 +211,8 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
       ssh $SSH $SSHOPTS 'kf='$KEEPLAST'
     set -e
     cd '$OUTD' || exit 4
-    echo "[+] Keeping latest $kf files *.*z, SH/GREP/LS sorted by moddate"
-    a=`ls -1t -p *z | grep -v /$`
+    echo "[+] Keeping latest $kf files (*tbz,*tgz,*wip,*cr), SH/GREP/LS, sorted by moddate"
+    a=`ls -1t -p *.tbz *.tgz *.wip *.cr 2>/dev/null | grep -v /$`
     echo "[++] ALL FILES ${a}";
     n=0
     for f in ${a}; do n=$(($n+1)); done
@@ -201,16 +224,17 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   fi
 
 else
- techo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1" >&2
+ techo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1, Enc: $ENCR" >&2
   set -x
   ionice -n 7 tar $TAROPTS | \
-    nice $ZIP
+    nice bash -c "$ZIP $ENCRP"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
   getps; r=$?
 fi
 # --ignore-command-error --ignore-failed-read
-if [ "$r" != "0" ]; then 
+
+if [ "$r" != "0" ]; then
   techo "[*] FAILED (code $r) ($r1)" >&2; exit $r;
 else
   techo "[+] SUCCESS (code $r) ($r1)" >&2
