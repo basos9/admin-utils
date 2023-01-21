@@ -73,6 +73,23 @@ ratarmount -o ro,allow_other mars.tgz ma
 ```
 
 
+### prepare restore:: mount
+
+```
+./res-prep.sh  src-20230121-0250.tgz outdir
+```
+
+
+### prepare restore:: from encrypted and mount
+
+```
+./res-prep.sh -d -   src-20230121-0250.tgz.cr outdir
+```
+
+### mount 
+```
+```
+
 ### restore from tar 
 Tar extracted or mounted to directory ma
 ```
