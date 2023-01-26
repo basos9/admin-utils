@@ -70,13 +70,14 @@ DEST=$SSH:$DST
 
 ([ -z "$DEST" ] || [ -z $SSH ] ) && usage && exit 2
 
-[ "$DO" != "1" ] && XARG="$XARG -n"
 
 ARET=0
 
 ## -H Hard Links
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
 BARG="--super -aSDz"
+
+[ "$DO" != "1" ] && BARG="$BARG -n"
 
 SARG="$SKARG -p $PORT"
 SARG="$SARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaster=auto"
@@ -102,12 +103,17 @@ if [[ $DOA = 1 ]]; then
 fi
 
 DOD=DRY
-if [[ $DO = 1 ]]; then DOD=DO; fi
+DOPFX=echo
+if [[ $DO = 1 ]]; then DOD=DO; DOPFX=; fi
 echo "This is $DOD run 
+  CMD $0 $@
   xfer $SRC to $DST root $DST
-  STEP1: $DO1  STEP2: $DO2  STEP3: $DO3  STEP4: $DO4,
+  STEP1 (KEEP SYSOLD): $DO1  STEP2(NOTHING): $DO2  STEP3(MAIN COPY): $DO3  STEP4(POST): $DO4,
   TWOPH $TWOF BATCH $BANG DES $DES, 
-  SSH args $SARG, SCP args $CSARG,  rsync args $BARG $XARG"
+  SSH args $SARG, 
+  SCP args $CSARG, 
+  rsync args $BARG $XARG
+"
 
 
 A=y
@@ -119,35 +125,25 @@ if ! [[ $A =~ y|Y ]]; then
 fi
 
 
-
-
 if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
-  set -x
+  #set -x
+  [ $DO 
   ssh $SARG $SSH "set -e; echo \"* [\`date +%Y%m%d-%H%M\`][\`hostname -f\`] Preparing $DST sysold sysnew\"
     mkdir -p $DST/sysold
     mkdir -p $DST/sysnew
-    if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else cp -a $DST/etc $DST/sysold; fi
-    if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else cp -a $DST/boot $DST/sysold; fi
+    if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else $DOPFX cp -a $DST/etc $DST/sysold; fi
+    if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else $DOPFX cp -a $DST/boot $DST/sysold; fi
     ke=\`uname -r\`
     echo \"RunningKernel \$ke\"
     mkdir -p $DST/sysold/lib/modules
-    if [ -d $DST/sysold/lib/modules/\$ke ]; then echo \"Already existing $DST/sysold/lib/modules/\$ke. Bye\"; r=6; else cp -a $DST/lib/modules/\$ke $DST/sysold/lib/modules/\$ke; fi
+    if [ -d $DST/sysold/lib/modules/\$ke ]; then echo \"Already existing $DST/sysold/lib/modules/\$ke. Bye\"; r=6; else $DOPFX cp -a $DST/lib/modules/\$ke $DST/sysold/lib/modules/\$ke; fi
     echo \"code \$r\";
     exit \$r"
   RT=$?; set +x
   [ "$RT" != "0" ] && ARET=$RT
 
-  if [ "$ARET" != "0" ];  then 
-    A=y
-    if [[ $BANG != 1 ]]; then
-      read -p "Maybe not or ?" A
-    fi
-    if ! [[ $A =~ y|Y ]]; then
-      exit 4
-    fi
-  fi
 
   echo ""
   echo "*** STEP 1b: RSYNC $SRC/etc to $DEST/sysnew for reference"
@@ -161,27 +157,47 @@ if [[ $DO1 = 1 ]]; then
   ##scp -r $CSARG $SRC/etc/ $SSH:$DST/sysnew/etc/
   #RT=$?;   set +x
   #[ "$RT" != "0" ] && ARET=$RT
-fi
 
-if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
-  echo
-  echo "*** STEP 2 (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
-  rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh $SARG" $SRC $DEST/sysnew/
-  RT=$?;   set +x
-  [ "$RT" != "0" ] && ARET=$RT
+  if [[ $TWOF = 1 ]] ; then
+    echo
+    echo "*** STEP 1c (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
+    rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh $SARG" $SRC $DEST/sysnew/
+    RT=$?;   set +x
+    [ "$RT" != "0" ] && ARET=$RT
 
-  XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
-fi
-
-if [ "$ARET" != "0" ];  then 
-  A=y
-  if [[ $BANG != 1 ]]; then
-    read -p "Maybe not or ?" A
+    XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
   fi
-  if ! [[ $A =~ y|Y ]]; then
-    exit 4
+
+  if [ "$ARET" != "0" ];  then 
+    A=y
+    if [[ $BANG != 1 ]]; then
+      read -p "Maybe not or ?" A
+    fi
+    if ! [[ $A =~ y|Y ]]; then
+      exit 4
+    fi
   fi
 fi
+
+#if [[ $TWOF = 1 ]] && [[ $DO2 = 1 ]]; then
+#  echo
+#  echo "*** STEP 2 (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
+#  rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh $SARG" $SRC $DEST/sysnew/
+#  RT=$?;   set +x
+#  [ "$RT" != "0" ] && ARET=$RT
+#
+#  XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
+#fi
+
+#if [ "$ARET" != "0" ];  then 
+#  A=y
+#  if [[ $BANG != 1 ]]; then
+#    read -p "Maybe not or ?" A
+#  fi
+#  if ! [[ $A =~ y|Y ]]; then
+#    exit 4
+#  fi
+#fi
 
 
 if [[ $TWOF != 1 ]]; then
@@ -221,7 +237,9 @@ if [[ $DO3 = 1 ]]; then
   echo "*** SYNCED $ARET ***"
   if [[ $XARG =~ grub.cfg ]]; then
     # SAFE mode
-    echo "*** We kept grub and kernel config. If you want to use new run 'cp -v /sysnew/boot/grub/grub.cfg /boot'"
+    echo "*** We kept grub and kernel config. If you want to use new run 
+cp -av /sysnew/boot/grub/grub.cfg /boot
+"
   else
     ke=`uname -r`
     echo "** For keeping existing kernel do
@@ -244,7 +262,7 @@ if [[ $DO4 = 1 ]]; then
 
   echo "* POST: DIFFING"
   ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces; 
-   if [ "$UN" != "1" ]; then
+   if [ "\$UN\" != \"1\" ]; then
      cp -a $DST/sysnew/etc/fstab $DST/etc/fstab.new
      cp -a $DST/sysnew/etc/network/interfaces $DST/etc/network/interfaces.new
      cp -a $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
@@ -269,10 +287,11 @@ EXCLUDED /etc/network/interfaces* (debian) (then systemctl restart networking) o
 EXCLUDED /etc/resolv.conf
 ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
   ssh $SARG -o StrictHostKeyChecking=no $SSH  'set -x; hostname;
- cat /proc/mounts > /etc/mtab
+ ! [ -h /etc/mtab ] && cat /proc/mounts > /etc/mtab
  echo "* Fixing grub-install"
  root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1; exit }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
- if [ -n "$root" ]; then grub-install $root || grub-install /dev/sda; fi
+ if [ -z "$root" ]; then root=/dev/sda; echo \"** Didnt find root device. Asuming $root\"; fi
+ grub-install $root
  if grep debian /etc/os-release; then update-grub; fi
  set +x
  echo "* Fixing root passwd"
