@@ -129,7 +129,6 @@ if [[ $DO1 = 1 ]]; then
   echo ""
   echo "*** STEP 1a: SSH to $SSH to prepare /sysold and /sysnew (backup /etc)"
   #set -x
-  [ $DO 
   ssh $SARG $SSH "set -e; echo \"* [\`date +%Y%m%d-%H%M\`][\`hostname -f\`] Preparing $DST sysold sysnew\"
     mkdir -p $DST/sysold
     mkdir -p $DST/sysnew
