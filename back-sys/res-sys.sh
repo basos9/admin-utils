@@ -13,6 +13,7 @@ DO3=0
 DO4=0
 DOA=1
 DES=
+UN=
 
 usage()
 {
@@ -26,6 +27,7 @@ usage()
    -o  Extra rsync options
    -O  Extra ssh/scp options
    -H  SSH/SCP no strictHostKeyChecking
+   -u  UNSAFE mode, good for same env restoring, exclude running kernel, network config (interfaces, resolv.conf) , fstab
    -S  SRC dir, default $BASE
    -T  Run two phase, excluding /bin /sbin /lib, **EXPERIMENTAL CROSS DISTRO**
    -B  BANG! Dont stop on errors
@@ -36,7 +38,7 @@ EOF
    ## -r  Running system, exclude things
 }
 
-while getopts “hp:cvdo:S:TB1234HO:e:” OPTION
+while getopts “hp:cvdo:S:TB1234HO:e:u” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -49,6 +51,7 @@ do
          O)  SKARG="$SKARG $OPTARG";;
          H)  SKARG="$SKARG -oStrictHostKeyChecking=no"; DES="$DES STRICTH 0" ;;
          S)  SRC="$OPTARG" ;;
+         u)  UN=1 ; DES="$DES UNSAFE mode (same ENV)" ;;
          T)  TWOF=1 ;;
          B)  BANG=1 ;;
          1)  DOA=0; DO1=1 ;;
@@ -102,9 +105,9 @@ DOD=DRY
 if [[ $DO = 1 ]]; then DOD=DO; fi
 echo "This is $DOD run 
   xfer $SRC to $DST root $DST
-  STEP1: $DO1  STEP2: $DO2  STEP3: $DO3  STEP4: $DO4
-  TWOPH $TWOF BATCH $BANG DES, SSH args $SARG, SCP args $CSARG
-  rsync args $BARG $XARG"
+  STEP1: $DO1  STEP2: $DO2  STEP3: $DO3  STEP4: $DO4,
+  TWOPH $TWOF BATCH $BANG DES $DES, 
+  SSH args $SARG, SCP args $CSARG,  rsync args $BARG $XARG"
 
 
 A=y
@@ -196,39 +199,38 @@ if [[ $DO3 = 1 ]]; then
     echo "*** NOW WE ARE MAKING A NEW SYSTEM"
   fi
 
-  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip), exc /etc/fstab, /etc/network/interfaces*"
+  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip)"
 
-  ker=`ssh $SARG $SSH "uname -r"`
-  RT=$?
-  if [ "$RT" != "0" ] && [ -n "$ker" ]; then
-    echo "* Excluding running kernel $ker modules, boot stuff, keeping grub.conf"
-    XARG="$XARG --exclude '/boot/*$ker*' --exclude '/lib/modules/$ker' --exclude '/boot/grub/grub.cfg"
+  if [[ $UN != 1 ]]; then
+    ker=`ssh $SARG $SSH "uname -r"`
+    RT=$?;   set +x
+    [ "$RT" != "0" ] && ARET=$RT
+
+    echo "* SAFE mode, xclude also/etc/fstab  /etc/network/interfaces*, /etc/resolv.conf"
+    XARG="$XARG --exclude '/etc/fstab' --exclude '/etc/network/interfaces*' --exclude '/etc/resolv.conf'  --exclude '/etc/sysconfig/network-scripts*'"
+    if [ -n "$ker" ]; then
+      echo "* Excluding running kernel $ker modules, boot stuff, keeping grub.conf"
+      XARG="$XARG --exclude '/boot/*$ker*' --exclude '/lib/modules/$ker' --exclude '/boot/grub/grub.cfg"
+    fi
   fi
   set -x
-  rsync $BARG --exclude '/sys/*' --exclude '/proc/' --exclude '/dev/' --exclude '/tmp/*' --exclude '/run/*' --exclude '/var/run/*' --exclude '/mnt/' --exclude '/etc/fstab' --exclude '/etc/network/interfaces*'  --exclude '/etc/sysconfig/network-scripts*' $XARG -e "ssh $SARG" $SRC/ $DEST
+  rsync $BARG --exclude '/sys/*' --exclude '/sysold' --exclude '/sysnew' --exclude '/proc/' --exclude '/dev/' --exclude '/tmp/*' --exclude '/run/*' --exclude '/var/run/*' --exclude '/mnt/'  $XARG -e "ssh $SARG" $SRC/ $DEST
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
-  echo "*** POST: DIFFING"
-  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces"
-
   echo "*** SYNCED $ARET ***"
   if [[ $XARG =~ grub.cfg ]]; then
+    # SAFE mode
     echo "*** We kept grub and kernel config. If you want to use new run 'cp -v /sysnew/boot/grub/grub.cfg /boot'"
-  fi
-  ke=`uname -r`
-  echo "** For keeping existing kernel do
+  else
+    ke=`uname -r`
+    echo "** For keeping existing kernel do
 cp -av /sysold/boot/vmlinuz-$ke /sysold/boot/initrd.img-$ke /boot/
 cp -av /sysold/lib/modules/$ke /lib/modules/
-  "
-  echo "*** Check. Maybe fix them manually (if not ok STEP 4) !!:"
-  echo "*
-GRUB-INSTALL
-KERNEL BOOT and initrd
-KERNEL MODULES
-EXCLUDED /etc/fstab
-EXCLUDE /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
-ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
+    "
+  fi
+
+
   if [[ $TWOF = 1 ]]; then
     echo "* Hopefully you already have a session and in addition to other tasks try to
 - move back base utils (/bin /sbin/ lib*) from /sysnew to / (for stuff excluded)"
@@ -239,13 +241,40 @@ fi
 if [[ $DO4 = 1 ]]; then
   echo
   echo "*** STEP 4: POST: fixings"
+
+  echo "* POST: DIFFING"
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces; 
+   if [ "$UN" != "1" ]; then
+     cp -a $DST/sysnew/etc/fstab $DST/etc/fstab.new
+     cp -a $DST/sysnew/etc/network/interfaces $DST/etc/network/interfaces.new
+     cp -a $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
+     echo '* Created /etc/fstab.new /etc/network/interfactes.new /etc/resolv.conf.new '
+   fi
+   "
+  RT=$?;   set +x
+  [ "$RT" != "0" ] && ARET=$RT
+  echo "CODE $RT"
+
+  echo
+  echo "*** Check. Maybe fix them manually !!:"
+  if [[ $UN = 1 ]]; then
+    echo "* This was an UNSAFE so things like fstab, boot, network were not exlcuded !!"
+  fi
+  echo "*
+GRUB-INSTALL
+KERNEL BOOT and initrd
+KERNEL MODULES
+EXCLUDED /etc/fstab
+EXCLUDED /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
+EXCLUDED /etc/resolv.conf
+ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
   ssh $SARG -o StrictHostKeyChecking=no $SSH  'set -x; hostname;
  cat /proc/mounts > /etc/mtab
  echo "* Fixing grub-install"
  root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1; exit }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
  if [ -n "$root" ]; then grub-install $root || grub-install /dev/sda; fi
  if grep debian /etc/os-release; then update-grub; fi
-
+ set +x
  echo "* Fixing root passwd"
  if [ "'$BANG'" != "1" ]; then
    echo "Want to update root passwd? ";  read A
@@ -255,6 +284,8 @@ if [[ $DO4 = 1 ]]; then
    passwd -l root
  fi
  echo "*** logout from `hostname -f`"'
+  RT=$?;   set +x
+  echo "CODE $RT"
 
 fi
 
