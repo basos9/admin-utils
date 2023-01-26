@@ -14,7 +14,7 @@ DO4=0
 DOA=1
 DES=
 UN=
-
+CMD=$0 $@
 usage()
 {
   cat >&2 <<EOF
@@ -27,6 +27,7 @@ usage()
    -o  Extra rsync options
    -O  Extra ssh/scp options
    -H  SSH/SCP no strictHostKeyChecking
+   -X  SSH/SCP no Host Checking UserKnownHostsFile=/dev/null
    -u  UNSAFE mode, good for same env restoring, exclude running kernel, network config (interfaces, resolv.conf) , fstab
    -S  SRC dir, default $BASE
    -T  Run two phase, excluding /bin /sbin /lib, **EXPERIMENTAL CROSS DISTRO**
@@ -38,7 +39,7 @@ EOF
    ## -r  Running system, exclude things
 }
 
-while getopts “hp:cvdo:S:TB1234HO:e:u” OPTION
+while getopts “hp:cvdo:S:TB1234HO:e:uX” OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -50,6 +51,7 @@ do
          o)  XARG="$XARG $OPTARG";;
          O)  SKARG="$SKARG $OPTARG";;
          H)  SKARG="$SKARG -oStrictHostKeyChecking=no"; DES="$DES STRICTH 0" ;;
+         X)  SKARG="$SKARG -oUserKnownHostsFile=/dev/null"; DES="$DES NOH 0" ;;
          S)  SRC="$OPTARG" ;;
          u)  UN=1 ; DES="$DES UNSAFE mode (same ENV)" ;;
          T)  TWOF=1 ;;
@@ -106,7 +108,7 @@ DOD=DRY
 DOPFX=echo
 if [[ $DO = 1 ]]; then DOD=DO; DOPFX=; fi
 echo "This is $DOD run 
-  CMD $0 $@
+  CMD $CMD
   xfer $SRC to $DST root $DST
   STEP1 (KEEP SYSOLD): $DO1  STEP2(NOTHING): $DO2  STEP3(MAIN COPY): $DO3  STEP4(POST): $DO4,
   TWOPH $TWOF BATCH $BANG DES $DES, 
@@ -260,8 +262,8 @@ if [[ $DO4 = 1 ]]; then
   echo "*** STEP 4: POST: fixings"
 
   echo "* POST: DIFFING"
-  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces; 
-   if [ "\$UN\" != \"1\" ]; then
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces;
+   if [ \"$UN\" != \"1\" ]; then
      cp -a $DST/sysnew/etc/fstab $DST/etc/fstab.new
      cp -a $DST/sysnew/etc/network/interfaces $DST/etc/network/interfaces.new
      cp -a $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
