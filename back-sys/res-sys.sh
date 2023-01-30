@@ -1,5 +1,5 @@
 #!/bin/bash
-#v1.2
+#v1.3
 SRC=.
 PORT=22
 XARG=""
@@ -14,7 +14,7 @@ DO4=0
 DOA=1
 DES=
 UN=
-CMD=$0 $@
+CMD="$0 $@"
 usage()
 {
   cat >&2 <<EOF
@@ -28,7 +28,7 @@ usage()
    -O  Extra ssh/scp options
    -H  SSH/SCP no strictHostKeyChecking
    -X  SSH/SCP no Host Checking UserKnownHostsFile=/dev/null
-   -u  UNSAFE mode, good for same env restoring, exclude running kernel, network config (interfaces, resolv.conf) , fstab
+   -u  UNSAFE mode, good for same env restoring, DO NOT exclude running kernel, network config (interfaces, resolv.conf) , fstab
    -S  SRC dir, default $BASE
    -T  Run two phase, excluding /bin /sbin /lib, **EXPERIMENTAL CROSS DISTRO**
    -B  BANG! Dont stop on errors
@@ -47,7 +47,7 @@ do
          c)  DO=1 ;;
          v)  XARG="$XARG -v" ; DES="$DES VERB 1" ;;
          d)  XARG="$XARG --delete" DES="$DES DEL 1";;
-         e)  XARG="$XARG --exclude $OPTARG";;
+         e)  XARG="$XARG --exclude=\"$OPTARG\"";;
          o)  XARG="$XARG $OPTARG";;
          O)  SKARG="$SKARG $OPTARG";;
          H)  SKARG="$SKARG -oStrictHostKeyChecking=no"; DES="$DES STRICTH 0" ;;
@@ -77,6 +77,7 @@ ARET=0
 
 ## -H Hard Links
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
+#  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip)"
 BARG="--super -aSDz"
 
 [ "$DO" != "1" ] && BARG="$BARG -n"
@@ -89,16 +90,16 @@ CSARG="$CSARG -oControlPath=~/.ssh-res-sys-%C -oControlPersist=60 -oControlMaste
 
 echo "Restore live system from backup (tar) with rsync.
 This script uses ssh ControlMaster channel in ~/.ssh-res-sys-%C.
-If you would like to setup ssh ControlMaster channel. 
-Run the following:
-
-cat >> ~/.ssh/config <'EOF'
-ControlPath ~/.ssh-%C 
-ControlPersist 30
-ControlMaster auto
-EOF
-
 "
+
+#If you would like to setup ssh ControlMaster channel. 
+#Run the following:
+#
+#cat >> ~/.ssh/config <'EOF'
+#ControlPath ~/.ssh-%C 
+#ControlPersist 30
+#ControlMaster auto
+#EOF
 
 if [[ $DOA = 1 ]]; then
   DO1=1; DO2=1; DO3=1; DO4=1;
@@ -107,14 +108,15 @@ fi
 DOD=DRY
 DOPFX=echo
 if [[ $DO = 1 ]]; then DOD=DO; DOPFX=; fi
-echo "This is $DOD run 
+echo "This is $DOD run
   CMD $CMD
-  xfer $SRC to $DST root $DST
+  xfer $SRC to $DEST
   STEP1 (KEEP SYSOLD): $DO1  STEP2(NOTHING): $DO2  STEP3(MAIN COPY): $DO3  STEP4(POST): $DO4,
-  TWOPH $TWOF BATCH $BANG DES $DES, 
-  SSH args $SARG, 
-  SCP args $CSARG, 
-  rsync args $BARG $XARG
+  TWOPH $TWOF, BATCH $BANG, $DES
+  SSH args $SARG
+  SCP args $CSARG 
+  RSYNC base args $BARG
+  RSYNC step3 args $XARG
 "
 
 
@@ -134,6 +136,7 @@ if [[ $DO1 = 1 ]]; then
   ssh $SARG $SSH "set -e; echo \"* [\`date +%Y%m%d-%H%M\`][\`hostname -f\`] Preparing $DST sysold sysnew\"
     mkdir -p $DST/sysold
     mkdir -p $DST/sysnew
+    rsync --version || { echo 'Rsync NOT found. Bye' && exit 2; }
     if [ -d $DST/sysold/etc ]; then echo \"Already existing $DST/sysold/etc. Bye\"; r=4; else $DOPFX cp -a $DST/etc $DST/sysold; fi
     if [ -d $DST/sysold/boot ]; then echo \"Already existing $DST/sysold/boot. Bye\"; r=5; else $DOPFX cp -a $DST/boot $DST/sysold; fi
     ke=\`uname -r\`
@@ -162,11 +165,11 @@ if [[ $DO1 = 1 ]]; then
   if [[ $TWOF = 1 ]] ; then
     echo
     echo "*** STEP 1c (for two phase): RSYNC $SRC/bin sbin lib* to $DEST/sysnew for reference"
-    rsync $BARG --delete --include '/bin*' --include '/sbin*' --include '/lib*' --exclude '/*' -e "ssh $SARG" $SRC $DEST/sysnew/
+    rsync $BARG --delete --include='/bin*' --include='/sbin*' --include='/lib*' --exclude='/*' -e "ssh $SARG" $SRC/ $DEST/sysnew/
     RT=$?;   set +x
     [ "$RT" != "0" ] && ARET=$RT
 
-    XARG="$XARG --exclude '/bin*' --exclude '/sbin*' --exclude '/lib*' "
+    XARG="$XARG --exclude='/bin*' --exclude='/sbin*' --exclude='/lib*' "
   fi
 
   if [ "$ARET" != "0" ];  then 
@@ -224,14 +227,15 @@ if [[ $DO3 = 1 ]]; then
     [ "$RT" != "0" ] && ARET=$RT
 
     echo "* SAFE mode, xclude also/etc/fstab  /etc/network/interfaces*, /etc/resolv.conf"
-    XARG="$XARG --exclude '/etc/fstab' --exclude '/etc/network/interfaces*' --exclude '/etc/resolv.conf'  --exclude '/etc/sysconfig/network-scripts*'"
+    XARG="$XARG --exclude=/etc/fstab --exclude=\"/etc/network/interfaces*\" --exclude=/etc/resolv.conf  --exclude=\"/etc/sysconfig/network-scripts*\""
     if [ -n "$ker" ]; then
       echo "* Excluding running kernel $ker modules, boot stuff, keeping grub.conf"
-      XARG="$XARG --exclude '/boot/*$ker*' --exclude '/lib/modules/$ker' --exclude '/boot/grub/grub.cfg"
+      XARG="$XARG --exclude=\"/boot/*$ker*\" --exclude=\"/lib/modules/$ker\" --exclude=\"/usr/lib/modules/$ker\" --exclude=/boot/grub/grub.cfg"
     fi
   fi
   set -x
-  rsync $BARG --exclude '/sys/*' --exclude '/sysold' --exclude '/sysnew' --exclude '/proc/' --exclude '/dev/' --exclude '/tmp/*' --exclude '/run/*' --exclude '/var/run/*' --exclude '/mnt/'  $XARG -e "ssh $SARG" $SRC/ $DEST
+  CMD="rsync $BARG $XARG --exclude=/sys/ --exclude=/sysold --exclude=/sysnew --exclude=/proc/ --exclude=/dev/ --exclude=/tmp/ --exclude=\"/run/*\" --exclude=\"/var/run/*\" --exclude=/mnt/ --exclude=/media/ -e \"ssh $SARG\" $SRC/ $DEST/"
+  eval $CMD
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT
 
@@ -262,11 +266,11 @@ if [[ $DO4 = 1 ]]; then
   echo "*** STEP 4: POST: fixings"
 
   echo "* POST: DIFFING"
-  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces;
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  "set -x; diff -u $DST/etc/fstab $DST/sysnew/etc/fstab; diff -u $DST/etc/network/interfaces $DST/sysnew/etc/network/interfaces; set +x;
    if [ \"$UN\" != \"1\" ]; then
-     cp -a $DST/sysnew/etc/fstab $DST/etc/fstab.new
-     cp -a $DST/sysnew/etc/network/interfaces $DST/etc/network/interfaces.new
-     cp -a $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
+     cp -av $DST/sysnew/etc/fstab $DST/etc/fstab.new
+     cp -av $DST/sysnew/etc/network/interfaces $DST/etc/network/interfaces.new
+     cp -av $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
      echo '* Created /etc/fstab.new /etc/network/interfactes.new /etc/resolv.conf.new '
    fi
    "
@@ -287,7 +291,7 @@ EXCLUDED /etc/fstab
 EXCLUDED /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
 EXCLUDED /etc/resolv.conf
 ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
-  ssh $SARG -o StrictHostKeyChecking=no $SSH  'set -x; hostname;
+  ssh $SARG -o StrictHostKeyChecking=no $SSH  'hostname;
  ! [ -h /etc/mtab ] && cat /proc/mounts > /etc/mtab
  echo "* Fixing grub-install"
  root=`cat /proc/mounts  | awk '"'"' $2 ~ /^\/$/ { print $1; exit }'"'"' | sed '"'"'s/[0-9]*$//'"'"'`
