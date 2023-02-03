@@ -273,6 +273,8 @@ if [[ $DO4 = 1 ]]; then
      cp -av $DST/sysnew/etc/resolv.conf $DST/etc/resolv.conf.new
      echo '* Created /etc/fstab.new /etc/network/interfactes.new /etc/resolv.conf.new '
    fi
+   chown root:root /
+   chmod 755 /
    "
   RT=$?;   set +x
   [ "$RT" != "0" ] && ARET=$RT

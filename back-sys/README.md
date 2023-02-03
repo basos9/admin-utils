@@ -125,4 +125,12 @@ NOTE: Vagrantfile-res-test is an example to test restore in a vagrant box
 ```
 tar tvf mars.tar 
 ```
+- virtualmin migrations
+```
+## BULK CHANGE ip
+virtualmin list-domains | sed -n '3,$p' |cut -d ' ' -f 1 | xargs -I {} virtualmin modify-domain --domain {} --shared-ip 10.0.20.39
+
+## BULK change domain
+virtualmin list-domains | sed -n '3,$p' |cut -d ' ' -f 1  | xargs -I {} bash -c ' N=`sed "s/example.com/example.local/"<<<"{}"`; echo "xform {} to $N";  virtualmin modify-domain --domain {} --newdomain $N'
+```
 
