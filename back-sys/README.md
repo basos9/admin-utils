@@ -5,17 +5,17 @@ Create running system tar
 - backup system to local tar
 ```
 ## backup to local directory (user backer or specified by -u)
-back-sys/back-sys-full.sh /var/backups/system
+./admin-utils/back-sys/back-sys-full.sh /var/backups/system
 ```
 - backup system to remote ssh
 ```
 ## backup to remote ssh
-back-sys/back-sys-full.sh -r ssh://user@remote:port /
+./admin-utils/back-sys/back-sys-full.sh -r ssh://user@remote:port /
 ```
 - backup system to pipe
 ```
 ## backup to pipe
-back-sys/back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
+./admin-utils/back-sys/back-sys-full.sh -z bzip2 - | ssh -p 2221 user@remote.host 'cat > /mnt/data1/host-backup.tgz
 ```
 - reverse remote backup
 ```
@@ -76,14 +76,14 @@ ratarmount -o ro,allow_other mars.tgz ma
 ### prepare restore:: mount
 
 ```
-./res-prep.sh  src-20230121-0250.tgz outdir
+./admin-utils/back-sys/res-prep.sh  src-20230121-0250.tgz outdir
 ```
 
 
 ### prepare restore:: from encrypted and mount
 
 ```
-./res-prep.sh -d -   src-20230121-0250.tgz.cr outdir
+./admin-utils/back-sys/res-prep.sh -d -   src-20230121-0250.tgz.cr outdir
 ```
 
 ### mount 
@@ -94,17 +94,20 @@ ratarmount -o ro,allow_other mars.tgz ma
 Tar extracted or mounted to directory ma
 ```
 ### test (dry run)
-./res-sys.sh -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11-dry.log
+```
+./admin-utils/back-sys/res-sys.sh -v -dHX -S mp root@10.0.20.59 / 
+```
 
 ## DO
-./res-sys.sh -c -v -d -S ma root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
-./res-sys.sh -e '/vagrant*' -c -v -d -S mars.tar root@10.0.20.39 / 2>&1 | tee res-host-deb11.log
+./admin-utils/back-sys/res-sys.sh -c -dHX -S mp root@10.0.20.59 / 2>&1 | tee res-`date +%Y%m%d_%H%M%S`.log
+./admin-utils/back-sys/res-sys.sh -c -dHX -S mp -e '/vagrant*' root@10.0.20.59 / 2>&1 | tee res-`date +%Y%m%d_%H%M%S`.log
 ```
 
-which executes finally
+which executes finally something like
 ```
-rsync --super -aSDz --exclude '/sys*' --exclude /proc/ --exclude /dev/ --exclude /mnt/ --exclude /etc/fstab --exclude /etc/network/interfaces --exclude '/etc/sysconfing/network-scripts*' -e 'ssh -p 22' mp// root@10.0.20.59:/
+rsync --super -aSDz -n --delete --exclude=/etc/fstab '--exclude="/etc/network/interfaces*"' --exclude=/etc/resolv.conf '--exclude="/etc/sysconfig/network-scripts*"' '--exclude="/boot/*4.19.0-18-amd64*"' '--exclude="/lib/modules/4.19.0-18-amd64"' '--exclude="/usr/lib/modules/4.19.0-18-amd64"' --exclude=/boot/grub/grub.cfg --exclude=/sys/ --exclude=/sysold --exclude=/sysnew --exclude=/proc/ --exclude=/dev/ --exclude=/tmp/ '--exclude="/run/*"' '--exclude="/var/run/*"' --exclude=/mnt/ --exclude=/media/ -e '"ssh' -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -p 22 '-oControlPath=~/.ssh-res-sys-%C' -oControlPersist=60 '-oControlMaster=auto"' mp/ root@10.0.20.39://
 ```
+
 
 also we keep some files (like /etc/) in /sysold and we also sync new files in /sysnew
 
@@ -112,6 +115,8 @@ Things to consider afterwards
 - grub install and update-grub
 - fstab
 - networking
+
+
 
 NOTE: Vagrantfile-res-test is an example to test restore in a vagrant box
 

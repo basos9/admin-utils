@@ -78,7 +78,7 @@ ARET=0
 ## -H Hard Links
 ## -K This  option  causes the receiving side to treat a symlink to a directory as though it were a real directory, but only if it matches a real directory from the sender. 
 #  echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip)"
-BARG="--super -aSDz"
+BARG="--super --numeric-ids -aSDz"
 
 [ "$DO" != "1" ] && BARG="$BARG -n"
 
