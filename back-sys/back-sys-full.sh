@@ -25,6 +25,7 @@ usage()
    -k <keeplast>, keep this number of backups, default keep all, for local and remote modes
    -s, use sh mode for -k, also needs grep and ls, use in busybox chroots
    -t <tarargs>
+   -T <sshargs> (avoid -oStrictHostKeyChecking, -oPasswordAuthentication)
    -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
    -x pass --one-file-system to tar
    -W disable tar warnings for changed files (disables --warning no-file-ignored --warning no-file-changed)
@@ -33,7 +34,7 @@ usage()
    -H disable ssh option StrictHostKeyChecking=accept-new, which accepts unknown hosts (for -r remode mode)
    -P enable password authentication
    -b <root> default /
-   -c <pass-option> encrypt with openssl enc, argument is -pass argument of openssl enc or "ask" or "-" for interactive
+   -c <pass-option> encrypt with openssl enc, argument is -pass argument of openssl enc (e.g. file:.., pass:.., env:..) or "ask" or "-" for interactive
 EOF
 }
 
@@ -58,6 +59,7 @@ do
          x)  XARGS="$XARGS --one-file-system" ;;
          u)  USER=$OPTARG ;;
          r)  SSH=$OPTARG ;;
+         T)  SSHOPTS="$SSHOPTS $OPTARG" ;;
          b)  ROOT="$OPTARG" ;;
          W)  TWARGS="--warning no-file-ignored --warning no-file-changed" ;;
          E)  SKIPE1=0 ;;
