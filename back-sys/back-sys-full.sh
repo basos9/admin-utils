@@ -49,7 +49,7 @@ SH=
 ENCR=
 ENCR_PARG=
 ENCR_ARG="-pbkdf2 -aes256 -e"
-while getopts "hz:t:u:r:b:WEHPe:xk:sc:" OPTION
+while getopts "hz:t:u:r:b:WEHPe:xk:sc:T:" OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
