@@ -101,16 +101,16 @@ if [ -n "$ENCR" ]; then
 fi
 NAMEF=sys-full-`hostname`-$STAMP.$EXT
 NAME=$NAMEF.wip
-DEST=$OUTD/$NAME
+DEST=${OUTD%%/}/$NAME
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   DESTP=$(echo $DEST | sed 's/^\//.\//')
   XARGS="--exclude=$DESTP  $XARGS"
 fi
 TAROPTS="c -p $TWARGS
         --exclude=./proc --exclude=./sys
-        --exclude=./mnt/* --exclude=./media/* --exclude=./var/lib/backups
-        --exclude=./root/w --exclude=./var/swap*
-        --exclude=./$LOCK $XARGS -C $ROOT ."
+        --exclude=./mnt/* --exclude=./media/* --exclude=./var/backups
+        --exclude=./var/swap*
+        --exclude=.$LOCK $XARGS -C $ROOT ."
 
 if [ -n "$ENCR" ]; then
   ENCR="$ENCR $ENCR_ARG $ENCR_PARG"
