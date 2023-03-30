@@ -1,5 +1,4 @@
 ## LIVE backup and restore
-
 ### BACKUP
 Create running system tar
 - backup system to local tar
@@ -46,13 +45,13 @@ tar c -p --ignore-failed-read \
 ### RESTORE
 
 
-#### TAR PLAN 1: EXTRACT
+### TAR PLAN 1: EXTRACT
 Extract with root
 ```
 sudo tar xjf mars.tbz -C mars
 ```
 
-#### TAR PLAN 2: MOUNT
+### TAR PLAN 2: MOUNT
 - mount tar archivemount is slow
 - mount tar  use ratarmount, minimum version 0.9.2, as earlier versions do not preserve permissions
 
@@ -107,11 +106,11 @@ which executes finally something like
 ```
 rsync --super -aSDz -n --delete --exclude=/etc/fstab '--exclude="/etc/network/interfaces*"' --exclude=/etc/resolv.conf '--exclude="/etc/sysconfig/network-scripts*"' '--exclude="/boot/*4.19.0-18-amd64*"' '--exclude="/lib/modules/4.19.0-18-amd64"' '--exclude="/usr/lib/modules/4.19.0-18-amd64"' --exclude=/boot/grub/grub.cfg --exclude=/sys/ --exclude=/sysold --exclude=/sysnew --exclude=/proc/ --exclude=/dev/ --exclude=/tmp/ '--exclude="/run/*"' '--exclude="/var/run/*"' --exclude=/mnt/ --exclude=/media/ -e '"ssh' -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -p 22 '-oControlPath=~/.ssh-res-sys-%C' -oControlPersist=60 '-oControlMaster=auto"' mp/ root@10.0.20.39://
 ```
-
-
 also we keep some files (like /etc/) in /sysold and we also sync new files in /sysnew
 
-Things to consider afterwards
+
+
+### Things to consider afterwards
 - grub install and update-grub
 - fstab
 - networking
