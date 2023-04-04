@@ -212,7 +212,6 @@ else
   echo "* Will exclude also stuff /bin /sbin /lib* xarg: $XARG"
 fi
 
-
 if [[ $DO3 = 1 ]]; then
   echo ""
   if [[ $DO = 1 ]]; then
@@ -222,11 +221,11 @@ if [[ $DO3 = 1 ]]; then
   echo "*** STEP 3: RSYNC $SRC to $SSH:$DEST port $PORT, aHSKDz (all, hard links, sparse, keep dirlinks, dev & specials, zip)"
 
   if [[ $UN != 1 ]]; then
+    echo "* SAFE mode, xclude also/etc/fstab  /etc/network/interfaces*, /etc/resolv.conf"
     ker=`ssh $SARG $SSH "uname -r"`
     RT=$?;   set +x
     [ "$RT" != "0" ] && ARET=$RT
 
-    echo "* SAFE mode, xclude also/etc/fstab  /etc/network/interfaces*, /etc/resolv.conf"
     XARG="$XARG --exclude=/etc/fstab --exclude=\"/etc/network/interfaces*\" --exclude=/etc/resolv.conf  --exclude=\"/etc/sysconfig/network-scripts*\""
     if [ -n "$ker" ]; then
       echo "* Excluding running kernel $ker modules, boot stuff, keeping grub.conf"
@@ -282,17 +281,17 @@ if [[ $DO4 = 1 ]]; then
 
   echo
   echo "*** Check. Maybe fix them manually !!:"
+  echo "*
+MAYBE KERNEL BOOT and initrd /boot/vmlinuz* /boot/initramfs*
+MAYBE KERNEL MODULES /lib/modules/*
+GRUB-INSTALL grub-install
+DEVICES /etc/fstab
+NETWORK /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
+DNS /etc/resolv.conf
+ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
   if [[ $UN = 1 ]]; then
     echo "* This was an UNSAFE so things like fstab, boot, network were not exlcuded !!"
   fi
-  echo "*
-GRUB-INSTALL
-KERNEL BOOT and initrd
-KERNEL MODULES
-EXCLUDED /etc/fstab
-EXCLUDED /etc/network/interfaces* (debian) (then systemctl restart networking) or /etc/sysconfig/network-scripts* (rhel)
-EXCLUDED /etc/resolv.conf
-ACCESS check /etc/shadow and/or /root/.ssh/authorized_keys"
   ssh $SARG -o StrictHostKeyChecking=no $SSH  'hostname;
  ! [ -h /etc/mtab ] && cat /proc/mounts > /etc/mtab
  echo "* Fixing grub-install"

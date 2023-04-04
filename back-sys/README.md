@@ -48,21 +48,34 @@ tar c -p --ignore-failed-read \
 ### TAR PLAN 1: EXTRACT
 Extract with root
 ```
-sudo tar xjf mars.tbz -C mars
+sudo tar --numeric-owner -xjf mars.tbz -C mars
 ```
 
-### TAR PLAN 2: MOUNT
+### TAR PLAN 2: MOUNT tar
 - mount tar archivemount is slow
-- mount tar  use ratarmount, minimum version 0.9.2, as earlier versions do not preserve permissions
+- mount tar use **ratarmount**, minimum version 0.9.2, as earlier versions do not preserve permissions
 
 - install ratarmount
 ```
 https://unix.stackexchange.com/questions/24032/faster-alternative-to-archivemount/501909
 pip3 install --user ratarmount
+# or with venv
+python3 -m venv rt
+rt/bin/pip3 install  ratarmount
+. rt/bin/activate
 # or to force install from upstream
 python3 -m pip install --user --force-reinstall git+https://github.com/mxmlnkn/ratarmount.git@v0.9.2
 ```
-- mount tar ratarmount
+
+
+### prepare restore:: mount tar
+**NOTE** ratarmount parallization needs bzip2 format! Gzip will be slow on modern processors.
+
+```
+./admin-utils/back-sys/res-prep.sh  src-20230121-0250.tgz outdir
+```
+
+or manuall mount tar ratarmount
 ```
 ratarmount  -o ro mars.tgz ma
 # use parallel processors for bzip2
@@ -71,23 +84,12 @@ ratarmount  -o ro -P 6 mars.tbz ma
 ratarmount -o ro,allow_other mars.tgz ma
 ```
 
-
-### prepare restore:: mount
-
-```
-./admin-utils/back-sys/res-prep.sh  src-20230121-0250.tgz outdir
-```
-
-
 ### prepare restore:: from encrypted and mount
 
 ```
 ./admin-utils/back-sys/res-prep.sh -d -   src-20230121-0250.tgz.cr outdir
 ```
 
-### mount 
-```
-```
 
 ### restore from tar 
 Tar extracted or mounted to directory ma
