@@ -1,0 +1,34 @@
+## VARS
+#  MONACT_DISKERR_MP # mount point .e.g /media/data
+
+  if [ -z "$MONACT_DISKERR_MP" ]; then
+    echo "*** NO MP defined" >&2
+    exit 3
+  fi
+
+  _DEV=`mount | grep $MONACT_DISKERR_MP | sed -r 's/^([^ 0-9]+).*/\1/' | head -1`
+  if [ -z "$_DEV" ]; then
+    echo "*** NO DEVICE for MP $MONACT_DISKERR_MP" >&2;
+    exit 4 ;
+  fi
+
+  _SSZ=`blockdev --getpbsz $_DEV`
+  if [ "$?" != "0" ]; then
+    echo "*** CAN not get sector size" >&2
+    exit 5
+  fi
+
+monact_testit()
+{
+  # NOTE select first mount (for bind mounts)
+  _DEV=`mount | grep $MONACT_DISKERR_MP | sed -r 's/^([^ 0-9]+).*/\1/' | head -1`
+  if [ -z "$_DEV" ]; then    echo "*** DEVICE disappeared for MP $MONACT_DISKERR_MP" >&2;  return 0 ;  fi
+  # NOTE nonblock maybe does not do something
+  dd if=$_DEV of=/dev/null bs=$_SSZ count=1 iflag=direct,nonblock 2>&1
+}
+
+  if ! monact_testit; then
+    echo "*** First Check FAILED." >&2
+    ecit 6
+  fi
+

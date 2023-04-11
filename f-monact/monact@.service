@@ -1,0 +1,16 @@
+### MONACT service
+# Monitor something and act on error
+### INSTALL:
+# @see Readme.md
+[Unit]
+Description=Monitor Action Daemon (monact) (%i)
+After=rc-local.service
+# Documentation=
+
+[Service]
+EnvironmentFile=/etc/monact/%i.conf
+ExecStart=/usr/bin/bash -c '/usr/local/sbin/monact /usr/local/share/monact/$MONACT_CHECK.check /usr/local/share/monact/$MONACT_ACTION.act'
+#StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

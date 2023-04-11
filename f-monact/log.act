@@ -1,0 +1,8 @@
+## LOG a message to syslog/journal
+## VARS
+#  MONACT_LOG_MSG  #
+#  MONACT_LOG_PRI  # syslog priority
+monact_action()
+{
+  logger -t $TAG -p "${MONACT_LOG_PRI:-warn} "${MONACT_LOG_MSG:-DUMMY ACTION}"
+}

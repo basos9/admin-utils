@@ -1,0 +1,100 @@
+#!/bin/bash
+#v1.0
+# Monitor something (monact_testit fuction), 
+# Retry NTRIES times with SLEEPERR interval when failed (soft state)
+# Take monact_action remedy when tries exceeded (hard state)
+# Does not execute remedy again, when in hard state.
+# Normal monitor inverval SLEEP
+# Invoke as $0 check action 
+#  env.conf defines at least monact_testit, monact_action functions,
+#  ENVIRONEMNT
+#  overrides settings MONACT_SLEEP, MONACT_NTRIES, MONACT_SLEEPERR
+#
+#     vgouv <basos.g@gmx.net> 2018-2022
+
+# Defaults
+NTRIES=${MONACT_NTRIES:-3} # Number of retries
+SLEEP=${MONACT_SLEEP:-40}
+SLEEPERR=${MONACT_SLEEPERR:-15}
+DLEV=${MONACT_VERBOSITY:-1}
+
+#monact_testit()
+#{
+#}
+
+#monact_action()
+#{
+#}
+
+_CHECK=$1
+_ACT=$2
+
+if ! [ -e "$_CHECK" ]; then
+  echo "File not found $_CHECK" >&2
+  exit 2
+fi
+. $_CHECK
+
+if [ -n "$_ACT" ]; then
+  if ! [ -e "$_ACT" ]; then
+    echo "File not found $_ACT" >&2
+    exit 2
+  fi
+  . $_ACT
+fi
+
+## Refers to DLEV
+decho() {
+  LEV=$1
+  shift 1
+  if [[ $DLEV -ge $LEV ]]; then echo $@; fi
+}
+
+TAG=monact
+
+if ! (type "monact_testit" | grep -q "is a function") ; then
+  echo "Invalid args, monact_testit" >&2
+  exit 2
+fi
+
+if ! (type "monact_action" | grep -q "is a function") ; then
+  echo "Invalid args, monact_action" >&2
+  exit 2
+fi
+
+logger -s -t $TAG "Starting; SLEEP: $SLEEP, NTRIES: $NTRIES, SLEEPERR: $SLEEPERR, monact_action: `type monact_action`, monact_testit: `type monact_testit`" 2>&1
+
+BAD=0
+while true; do
+  N=$NTRIES
+  while ! (O=$(monact_testit ); R=$?; decho 2 $O; exit $R); do
+    BAD=1
+    if [ $N -eq 0 ]; then
+      # HARD state N=0 (transition)
+      # NOTE: the following message is noted on a logwatch pattern. DO NOT CHANGE.
+      logger -s -t $TAG -p err "Error (HARD), giving up after $NTRIES tries, taking actions. SLEEP $SLEEP"
+      #(monact_action)
+      (O=$(monact_action); R=$?; decho 2 $O; exit $R)
+      if [ "$?" != "0" ]; then
+        echo "** NOTE action failed." >&2
+      fi
+      let "N=N-1"
+      sleep $SLEEP
+    elif [ $N -lt 0 ]; then
+      # HARD state N<0
+      echo "$TAG, ERR (HARD), SLEEP $SLEEP"
+      sleep $SLEEP
+    else
+      # SOFT state N>=0
+      logger -s -t $TAG -p warn "Error (SOFT), error response, $N tries left, tot $NTRIES, SLEEP $SLEEPERR" 2>&1
+      let "N=N-1"
+      sleep $SLEEPERR
+    fi
+  done
+  if [ $BAD -eq 1 ]; then
+    BAD=0
+    logger -s -t $TAG -p info "Recovered, good response, SLEEP $SLEEP" 2>&1
+  fi
+  decho 2 "$TAG, OK, SLEEP $SLEEP"
+  sleep $SLEEP
+done

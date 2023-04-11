@@ -1,0 +1,15 @@
+## WEB check for status 200
+## VARS
+#  MONACT_WEB_URL  # Web service URL, e.g. http://example.com
+#  MONACT_WEB_CARGS # Curl args, e.g. --resolve example.com:80:ip
+#  MONACT_WEB_GREP # Optional Pass output to grep -q,  e.g. {code:"200"
+
+monact_testit()
+{
+  if [ -n "MONACT_WEB_GREP" ]; then
+    set -o pipefail
+    curl -sSf $MONACT_WEB_CARGS $MONACT_WEB_URL | grep -q "$MONACT_WEB_GREP"
+  else
+    curl -sSf $MONACT_WEB_CARGS $MONACT_WEB_URL
+  fi
+}

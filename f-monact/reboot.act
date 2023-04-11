@@ -1,0 +1,5 @@
+monact_action()
+{
+  logger -t $TAG -p warn "Rebooting"
+  reboot
+}
