@@ -22,8 +22,8 @@ cp /etc/monact/example.conf /etc/monact/<serviceid>.conf
 systemctl daemon-reload
 systemctl start monact@<serviceid>
 systemctl enable monact@<serviceid>
-journalctl fu monact@<serviceid>
-#
+journalctl -fu monact@<serviceid>
+```
 
 ## CHECKS 
 - diskerr.check: Checks that a device (derived from mountpoint) is still readable. This can be used for unstable interfaces (aka a usb disk that can glitch and suddently dissapear.
