@@ -55,7 +55,10 @@ monact_action()
 
 ## Configure check-mk LOGWATCH
 Configure logwatch, 
-# edit __/etc/check_mk/logwatch.cfg__
+
+```
+edit __/etc/check_mk/logwatch.cfg__
+```
 
 AFTER BLOCK
 ```
