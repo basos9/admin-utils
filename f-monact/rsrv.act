@@ -1,0 +1,37 @@
+## VARS
+# MONACT_RSRV_SERVICE  # service name
+# MONACT_RSRV_MODE # one of: restart (default), reload, start-stop
+
+[ -z "$MONACT_RSRV_SERVICE" ] && {
+  echo "Service not defined" >&2
+  exit 3
+}
+
+if [ -z "$MONACT_RSRV_MODE" ]; then
+  MONACT_RSRV_MODE=restart
+fi
+
+case "$MONACT_RSRV_MODE" in
+  restart|reload|start-stop)
+    true;
+  ;;
+  *)
+    echo "Wrong mode" >&2
+    exit 4
+  ;;
+esac
+
+
+monact_action()
+{
+  logger -t $TAG -p warn "Restarting service $MONACT_RSRV_SERVICE"
+  case "$MONACT_RSRV_MODE" in
+  restart|reload)
+    systemctl $MONACT_RSRV_MODE $MONACT_RSRV_SERVICE
+  ;;
+  start-stop)
+    systemctl stop $MONACT_RSRV_SERVICE
+    systemctl start $MONACT_RSRV_SERVICE
+  ;;
+  esac
+}

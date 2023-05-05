@@ -32,6 +32,7 @@ journalctl -fu monact@<serviceid>
 ## ACTIONS
 - reboot.act: Reboots the system!
 - log.act: Logs a line
+- rsrv.act: Restarts a service
 
 ## CUSTOM checks
 Create files under /usr/local/share/monact/<checkid>.check which defines the function `monact_testit`. 
