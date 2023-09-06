@@ -1,5 +1,5 @@
 #!/bin/bash
-#1.2
+#v2.0
 BASE=$(readlink -f `dirname $0`)
 
 USER=
@@ -26,8 +26,9 @@ usage()
    -s, use sh mode for -k, also needs grep and ls, use in busybox chroots
    -t <tarargs>
    -T <sshargs> (avoid -oStrictHostKeyChecking, -oPasswordAuthentication)
-   -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
-   -x pass --one-file-system to tar
+ * -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
+ * -X exclude some overhead mount points by fstype: squashfs,tmpfs,overlay (for docker), nsfs (snap related) and bind mounts from /etc/fstab
+ * -x pass --one-file-system to tar
    -W disable tar warnings for changed files (disables --warning no-file-ignored --warning no-file-changed)
    -E exact, do not ignore tar exit code 1, meaning some files changed while being archived
    -r <[user@]hostname or ssh://[user@]hostname[:port]>
@@ -48,14 +49,16 @@ KEEPLAST=
 SH=
 ENCR=
 ENCR_PARG=
+EXMP=
 ENCR_ARG="-pbkdf2 -aes256 -e"
-while getopts "hz:t:u:r:b:WEHPe:xk:sc:T:" OPTION
+while getopts "hz:t:u:r:b:WEHPe:xk:sc:T:X" OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
          z)  ZIP=$OPTARG  ;;
          t)  XARGS="$XARGS $OPTARG" ;;
-         e)  XARGS="$XARGS --exclude ${OPTARG/#\//.\/}";;
+         X)  EXMP=1 ;;
+         e)  XARGS="$XARGS --exclude=\"${OPTARG/#\//.\/}\"";;
          x)  XARGS="$XARGS --one-file-system" ;;
          u)  USER=$OPTARG ;;
          r)  SSH=$OPTARG ;;
@@ -106,6 +109,16 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   DESTP=$(echo $DEST | sed 's/^\//.\//')
   XARGS="--exclude=$DESTP  $XARGS"
 fi
+## exclude mount points
+if [ "$EXMP" = "1" ]; then
+  XEX=`(
+## excluding mp /proc /sys /dev then also exclude loop devices or selected fs types
+  awk '$2 !~ /\/proc|\/sys|\/dev/ && ($1 ~ /loop/ || $3 ~ /squashfs|tmpfs|nsfs|overlay|AppImage/)  {print $2 }' < /proc/mounts | sort -u
+## exclude bind mounts 
+  awk '$4 ~ /bind/{print $1}' /etc/fstab
+  ) |  awk '{print "--exclude=.\"" $0 "\"" }'`
+  XARGS="$XARGS $XEX"
+fi
 TAROPTS="c -p $TWARGS
         --exclude=./proc --exclude=./sys
         --exclude=./mnt/* --exclude=./media/* --exclude=./var/backups
@@ -134,7 +147,7 @@ getps(){
 }
 
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
-  techo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST, ignore changed $SKIPE1, Enc $ENCR" >&2
+  techo "[+] FILE mode, zip $ZIP, user $USER, Taring to $DEST , ignore changed $SKIPE1, Enc $ENCR" >&2
   if ! [ -d "$OUTD" ]; then
     techo "[*] DIR not found $OUTD" >&2
     exit 4
@@ -144,7 +157,7 @@ if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
     SU="su $USER -c"
   fi
   set -x
-  ionice -n 7 tar  $TAROPTS | \
+  eval ionice -n 7 tar  $TAROPTS | \
     nice $SU "$ZIP $ENCRP >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
@@ -178,7 +191,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
   fi
 
   set -x
-  ionice -n 7 tar $TAROPTS | \
+  eval ionice -n 7 tar $TAROPTS | \
     nice bash -c "$ZIP $ENCRP" | \
     ssh $SSHOPTS $SSH "[ -d \"$OUTD\" ] || { echo \"[\`hostname -f\`] Creating dir $OUTD\" && mkdir -p \"$OUTD\"; }; cat >$DEST"
   r1=$?  R=(${PIPESTATUS[@]})
@@ -228,7 +241,7 @@ elif [ "$OUTD" != "-" ] && [ -n "$SSH" ]; then
 else
  techo "[+] STDOUT mode, zip $ZIP, tarring, ignore changed $SKIPE1, Enc: $ENCR" >&2
   set -x
-  ionice -n 7 tar $TAROPTS | \
+  eval ionice -n 7 tar $TAROPTS | \
     nice bash -c "$ZIP $ENCRP"
   r1=$?  R=(${PIPESTATUS[@]})
   set +x
