@@ -10,7 +10,8 @@ techo()
 usage()
 {
  cat >&2 <<EOF
-  Usage: $0 [opt] <SRCFILE> <OUTD>
+  Usage: $0 [opt] <SRCFILE> <OUTD|->
+    When OUTD is - then decrypt, when -d and pipe to out
    -d <pass-option> decrypt with openssl enc, argument is -pass argument of openssl enc or "ask" or "-" for interactive. Useful options are env:<var>, file:<path>
    -k Do not unlink decrupted file
 
@@ -54,38 +55,51 @@ MP=$OUTD
 techo "[+] Preparing file $SRC for outdir (mountpoint) $OUTD, Enc: $ENCR, UNLINKDEC: $RMDEC"
 
 if [ -n "$ENCR" ]; then
-  SRC1=${SRC//.cr}
-  if [ "$SRC" = "$SRC1" ]; then
-     SRC1="${SRC}.dec"
+  if [ "$OUTD" = "-" ]; then
+    techo "[+] Decrypting to stdout"
+    $ENCR < $SRC
+    r=$?
+    MP="-"
+  else
+    SRC1=${SRC//.cr}
+    if [ "$SRC" = "$SRC1" ]; then
+       SRC1="${SRC}.dec"
+    fi
+    SRC1="$OUTD/`basename $SRC1`"
+    techo "[+] Decrypting to $SRC1"
+    $ENCR < $SRC > $SRC1
+    r=$?
+    MP="$OUTD/mp"
   fi
-  SRC1="$OUTD/`basename $SRC1`"
-  techo "[+] Decrypting to $SRC1"
-  $ENCR < $SRC > $SRC1
-  r=$?
 
   if [ "$r" != "0" ]; then
      techo "[+] Error decrypting ($r). Exiting" >&2
      exit $r
   fi
-  MP="$OUTD/mp"
+else
+  if [ "$OUTD" = "-" ]; then
+    techo "[-] stdout has meaning with -d" >&2
+    exit 1
+  fi
 fi
 
-RATARMOUNT=ratarmount
+if [ "$OUTD" != "-" ]; then
 
-if ! which $RATARMOUNT; then
-  RATARMOUNT=$HOME/.local/bin/ratarmount
+  RATARMOUNT=ratarmount
+
+  if ! which $RATARMOUNT; then
+    RATARMOUNT=$HOME/.local/bin/ratarmount
+  fi
+
+  # use parallel processors for bzip2
+  $RATARMOUNT  -o ro -P 4 "$SRC1" $MP
+  r=$?
+
+  if [ -n "$ENCR" ] && [ "$RMDEC" = "1" ] ; then
+    echo "Unlinking decrypted"
+    rm -f $SRC1
+  fi
 fi
-
-# use parallel processors for bzip2
-$RATARMOUNT  -o ro -P 4 "$SRC1" $MP
-r=$?
-
-
-if [ -n "$ENCR" ] && [ "$RMDEC" = "1" ] ; then
-  echo "Unlinking decrypted"
-  rm -f $SRC1
-fi
-
 if [ "$r" != "0" ]; then
   techo "[*] FAILED (code $r) " >&2; exit $r;
 else
