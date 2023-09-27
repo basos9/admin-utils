@@ -52,11 +52,11 @@ fi
 
 MP=$OUTD
 
-techo "[+] Preparing file $SRC for outdir (mountpoint) $OUTD, Enc: $ENCR, UNLINKDEC: $RMDEC"
+techo "[+] Preparing file $SRC for outdir (mountpoint) $OUTD, Enc: $ENCR, UNLINKDEC: $RMDEC" >&2
 
 if [ -n "$ENCR" ]; then
   if [ "$OUTD" = "-" ]; then
-    techo "[+] Decrypting to stdout"
+    techo "[+] Decrypting to stdout" >&2
     $ENCR < $SRC
     r=$?
     MP="-"
@@ -66,7 +66,7 @@ if [ -n "$ENCR" ]; then
        SRC1="${SRC}.dec"
     fi
     SRC1="$OUTD/`basename $SRC1`"
-    techo "[+] Decrypting to $SRC1"
+    techo "[+] Decrypting to $SRC1" >&2
     $ENCR < $SRC > $SRC1
     r=$?
     MP="$OUTD/mp"
@@ -96,7 +96,7 @@ if [ "$OUTD" != "-" ]; then
   r=$?
 
   if [ -n "$ENCR" ] && [ "$RMDEC" = "1" ] ; then
-    echo "Unlinking decrypted"
+    echo "Unlinking decrypted" >&2
     rm -f $SRC1
   fi
 fi
