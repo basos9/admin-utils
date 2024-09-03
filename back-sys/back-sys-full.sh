@@ -113,9 +113,9 @@ fi
 if [ "$EXMP" = "1" ]; then
   XEX=`(
 ## excluding mp /proc /sys /dev then also exclude loop devices or selected fs types
-  awk '$2 !~ /\/proc|\/sys|\/dev/ && ($1 ~ /loop/ || $3 ~ /squashfs|tmpfs|nsfs|overlay|AppImage/)  {print $2 }' < /proc/mounts | sort -u
+  awk '$2 !~ /\/proc|\/sys|\/dev/ && ($1 ~ /loop/ || $3 ~ /squashfs|tmpfs|nsfs|overlay|AppImage/|ramfs)  {print $2 }' < /proc/mounts | sort -u
 ## exclude bind mounts 
-  awk '$4 ~ /bind/{print $1}' /etc/fstab
+  awk '$4 ~ /bind/{print $2}' /etc/fstab
   ) |  awk '{print "--exclude=.\"" $0 "\"" }'`
   XARGS="$XARGS $XEX"
 fi
