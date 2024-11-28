@@ -29,6 +29,7 @@ usage()
  * -e <exclude> pass --exclude to tar, note add leading slash e.g. /var/lib
  * -X exclude some overhead mount points by fstype: squashfs,tmpfs,overlay (for docker), nsfs (snap related) and bind mounts from /etc/fstab
  * -x pass --one-file-system to tar
+   -S no not exclude common system dirs. Use when backing non system dir (/proc /sys /mnt /media /var/backups /var/swap*)
    -W disable tar warnings for changed files (disables --warning no-file-ignored --warning no-file-changed)
    -E exact, do not ignore tar exit code 1, meaning some files changed while being archived
    -r <[user@]hostname or ssh://[user@]hostname[:port]>
@@ -50,8 +51,9 @@ SH=
 ENCR=
 ENCR_PARG=
 EXMP=
+EXSYS=1
 ENCR_ARG="-pbkdf2 -aes256 -e"
-while getopts "hz:t:u:r:b:WEHPe:xk:sc:T:X" OPTION
+while getopts "hz:t:u:r:b:WEHPe:xk:sc:T:XS" OPTION
 do
      case $OPTION in
          h)  usage; exit 1 ;;
@@ -71,6 +73,7 @@ do
          s)  SH=1 ;;
          P)  PASSAUTH=1 ;;
          c)  ENCR="openssl enc" ; [[ $OPTARG != "ask" ]] && [[ $OPTARG != "-" ]] && ENCR_PARG="-pass $OPTARG" ;;
+         S)  EXSYS= ;;
          ?)  usage; exit ;;
      esac
 done
@@ -107,23 +110,26 @@ NAME=$NAMEF.wip
 DEST=${OUTD%%/}/$NAME
 if [ "$OUTD" != "-" ] && [ -z "$SSH" ]; then
   DESTP=$(echo $DEST | sed 's/^\//.\//')
-  XARGS="--exclude=$DESTP  $XARGS"
+  XARGS="--exclude=$DESTP $XARGS"
 fi
 ## exclude mount points
 if [ "$EXMP" = "1" ]; then
   XEX=`(
 ## excluding mp /proc /sys /dev then also exclude loop devices or selected fs types
-  awk '$2 !~ /\/proc|\/sys|\/dev/ && ($1 ~ /loop/ || $3 ~ /squashfs|tmpfs|nsfs|overlay|AppImage/|ramfs)  {print $2 }' < /proc/mounts | sort -u
+  awk '$2 !~ /\/proc|\/sys|\/dev/ && ($1 ~ /loop/ || $3 ~ /squashfs|tmpfs|nsfs|overlay|AppImage|ramfs/)  {print $2 }' < /proc/mounts | sort -u
 ## exclude bind mounts 
   awk '$4 ~ /bind/{print $2}' /etc/fstab
   ) |  awk '{print "--exclude=.\"" $0 "\"" }'`
   XARGS="$XARGS $XEX"
 fi
-TAROPTS="c -p $TWARGS
-        --exclude=./proc --exclude=./sys
-        --exclude=./mnt/* --exclude=./media/* --exclude=./var/backups
-        --exclude=./var/swap*
-        --exclude=.$LOCK $XARGS -C $ROOT ."
+XSYS=
+if [ "$EXSYS" = "1" ]; then
+  XSYS="--exclude=./proc --exclude=./sys
+        --exclude='./mnt/*' --exclude='./media/*' --exclude=./var/backups
+        --exclude='./var/swap*'"
+fi
+TAROPTS="c -p $TWARGS $XSYS
+              --exclude=.$LOCK $XARGS -C $ROOT ."
 
 if [ -n "$ENCR" ]; then
   ENCR="$ENCR $ENCR_ARG $ENCR_PARG"
