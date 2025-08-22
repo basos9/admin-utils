@@ -6,10 +6,11 @@
 
 monact_testit()
 {
-  if [ -n "MONACT_WEB_GREP" ]; then
+  if [ -n "$MONACT_WEB_GREP" ]; then
     set -o pipefail
-    curl -sSf $MONACT_WEB_CARGS $MONACT_WEB_URL | grep -q "$MONACT_WEB_GREP"
+    /bin/curl -sSf -o /dev/null $MONACT_WEB_CARGS $MONACT_WEB_URL | /bin/grep -q "$MONACT_WEB_GREP"
   else
-    curl -sSf $MONACT_WEB_CARGS $MONACT_WEB_URL
+    /bin/curl -sSf -o /dev/null $MONACT_WEB_CARGS $MONACT_WEB_URL
   fi
 }
+
