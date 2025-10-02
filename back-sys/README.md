@@ -90,9 +90,13 @@ ratarmount -o ro,allow_other mars.tgz ma
 ./admin-utils/back-sys/res-prep.sh -d -   src-20230121-0250.tgz.cr outdir
 ```
 
+### download remoter and extract tar
+mkdir mp
+ssh user@remote.host 'cat /var/backups/sys-full-host-20250910.tgz' | tar xzf - -C mp
+
 
 ### restore from tar 
-Tar extracted or mounted to directory ma
+Tar extracted or mounted to directory mp
 ```
 ### test (dry run)
 ```
