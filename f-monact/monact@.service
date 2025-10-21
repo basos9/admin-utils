@@ -4,7 +4,7 @@
 # @see Readme.md
 [Unit]
 Description=Monitor Action Daemon (monact) (%i)
-After=rc-local.service
+After=rc-local.service %i.service
 # Documentation=
 
 [Service]
