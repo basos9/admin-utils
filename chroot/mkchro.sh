@@ -36,6 +36,7 @@ echo
 chown -v root:root $DIR
 if [ -n "$USER" ]; then
   HOMED=`getent passwd $USER | cut -d: -f 6`
+  usermod -s /bin/false $USER
   chown -v root:root $HOMED
 fi
 
@@ -79,6 +80,7 @@ cp -av /bin/busybox bin/busybox
 ln -sTf busybox bin/sh
 ln -sTf busybox bin/cat
 ln -sTf busybox bin/grep
+ln -sTf busybox bin/false
 
 if [ -n "$USER" ]; then
   echo "* Home directory for $USER"

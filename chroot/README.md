@@ -13,13 +13,10 @@ Config system, add group sshchroot for chrooters
 cat >/etc/ssh/sshd_config.d/sshchroot.conf <<'EOF'
 Match Group sshchroot
   ChrootDirectory %h/chroot
+  ForceCommand internal-sftp
 
 Match All
 EOF
-
-sed -re 's/^(Subsystem\s+sftp\s+).*/\1internal-sftp/' -i /etc/ssh/sshd_config
-# such as there is a directive
-Subsystem	sftp	internal-sftp
 
 groupadd sshchroot
 systemctl restart sshd
@@ -29,6 +26,7 @@ vim /etc/ssh/sshd_config
 
 Match Group sshchroot
   ChrootDirectory %h/chroot
+  ForceCommand internal-sftp
 ```
 
 Prepare a chroot for user backer
