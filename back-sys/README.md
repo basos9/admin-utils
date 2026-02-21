@@ -104,6 +104,7 @@ Tar extracted or mounted to directory mp
 ```
 
 ## DO
+```
 ./admin-utils/back-sys/res-sys.sh -c -dHX -S mp root@10.0.20.59 / 2>&1 | tee res-`date +%Y%m%d_%H%M%S`.log
 ./admin-utils/back-sys/res-sys.sh -c -dHX -S mp -e '/vagrant*' root@10.0.20.59 / 2>&1 | tee res-`date +%Y%m%d_%H%M%S`.log
 ```

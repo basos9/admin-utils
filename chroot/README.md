@@ -13,6 +13,10 @@ Config system, add group sshchroot for chrooters
 cat >/etc/ssh/sshd_config.d/sshchroot.conf <<'EOF'
 Match Group sshchroot
   ChrootDirectory %h/chroot
+
+# Optional for SFTP
+Match Group sftpchroot
+  ChrootDirectory %h/chroot
   ForceCommand internal-sftp
 
 Match All
